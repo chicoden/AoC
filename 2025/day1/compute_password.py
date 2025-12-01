@@ -13,6 +13,6 @@ for command in input_string.split():
     dial_position %= 100 # euclidean modulo to emulate wrapping behavior of dial
 
     if dial_position == 0:
-        passcode += 1 # passcode is the number of times the dial hits 0
+        passcode += 1 # passcode is the number of times the dial ends a rotation on a 0
 
 print("Passcode:", passcode)
