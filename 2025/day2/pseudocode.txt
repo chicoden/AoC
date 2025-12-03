@@ -23,12 +23,11 @@ loop:
     total = 0
     range_lo = 1
     loop:
-        range_hi = 10 * n - 1
-        multiplier = 10 * n + 1
+        range_hi = 10 * range_lo - 1
+        multiplier = 10 * range_lo + 1
 
         if range_lo * multiplier > end: # no further ranges intersect the search range
             break
-        range_lo > end / multiplier
 
         lo_multiple = ceildiv(start, multiplier)
         hi_multiple = floordiv(end, multiplier)
