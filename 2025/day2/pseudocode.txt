@@ -36,12 +36,10 @@ loop:
         # [halt, start, total, range_lo, multiplier, multiplier * range_lo, end] <- roll depth=5 rolls=4
         # [halt, start, total, range_lo, multiplier, multiplier * range_lo, end, end] <- dup
         # [halt, start, end, total, range_lo, multiplier, multiplier * range_lo, end] <- roll depth=6 rolls=1
-
         if range_lo * multiplier > end: # no further ranges intersect the search range
             break
 
-        # [halt, start, end, total, range_lo, multiplier, multiplier, multiplier]
-
+        # [halt, start, end, total, range_lo, multiplier] on stack
         lo_multiple = ceildiv(start, multiplier) # (start + multiplier-1) / multiplier
         hi_multiple = floordiv(end, multiplier)
         # must sum multiples in the intersection between the ranges [lo_multiple, hi_multiple] and [range_lo, range_hi]
