@@ -1,31 +1,52 @@
 halt = 0
 loop:
-    push 0
+    push 0 # add accumulator for first ID in range
     loop:
         ch = in()
         if ch > 47: # is digit
-            #push(pop() * 10 + (ch - '0'))
-            push '0', sub
-            roll depth=2 rolls=1
-            push 10, mul, add
+            push(pop() * 10 + (ch - '0')) # shift in digit
+            #push '0', sub
+            #roll depth=2 rolls=1 # roll accumulator to the top
+            #push 10, mul, add
         elif ch > 44: # dash
-            push 0
+            push 0 # add new accumulator for last ID in range
         elif ch > 43: # comma
             break
         else: # newline
             halt = 1
-            #roll depth=3 rolls=2
+            #roll depth=3 rolls=2 # roll halt flag to the top
             #pop, push 1
-            #roll depth=3 rolls=1
+            #roll depth=3 rolls=1 # roll it back to the bottom
             break
-
     # [halt, start, end] on stack
+
+    total = 0
+    range_lo = 1
     loop:
-        //test start
+        range_hi = 10 * n - 1
+        multiplier = 10 * n + 1
 
-        if start == end:
+        if range_lo * multiplier > end: # no further ranges intersect the search range
             break
-        start++
+        range_lo > end / multiplier
 
-    if halt:
+        lo_multiple = ceildiv(start, multiplier)
+        hi_multiple = floordiv(end, multiplier)
+        # must sum multiples in the intersection between the ranges [lo_multiple, hi_multiple] and [range_lo, range_hi]
+
+        # clip range
+        if range_lo > lo_multiple:
+            lo_multiple = range_lo
+        if hi_multiple > range_hi:
+            hi_multiple = range_hi
+
+        if lo_multiple > hi_multiple:
+            # empty intersection
+            continue
+
+        # calculate sum of range of multiples and add it to the total
+        total += (hi_multiple * (hi_multiple + 1) - (lo_multiple - 1) * lo_multiple) / 2 * multiplier
+        range_lo *= 10
+
+    if halt > 0:
         break
