@@ -1,0 +1,31 @@
+halt = 0
+loop:
+    push 0
+    loop:
+        ch = in()
+        if ch > 47: # is digit
+            #push(pop() * 10 + (ch - '0'))
+            push '0', sub
+            roll depth=2 rolls=1
+            push 10, mul, add
+        elif ch > 44: # dash
+            push 0
+        elif ch > 43: # comma
+            break
+        else: # newline
+            halt = 1
+            #roll depth=3 rolls=2
+            #pop, push 1
+            #roll depth=3 rolls=1
+            break
+
+    # [halt, start, end] on stack
+    loop:
+        //test start
+
+        if start == end:
+            break
+        start++
+
+    if halt:
+        break
