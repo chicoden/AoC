@@ -23,13 +23,26 @@ loop:
     total = 0
     range_lo = 1
     loop:
+        # [halt, start, end, total, range_lo] on stack
         range_hi = 10 * range_lo - 1
         multiplier = 10 * range_lo + 1
+
+        # [halt, start, end, total, range_lo, multiplier]
+        # [halt, start, end, total, range_lo, multiplier, multiplier] <- dup
+        # [halt, start, end, total, multiplier, multiplier, range_lo] <- roll depth=3 rolls=2
+        # [halt, start, end, total, multiplier, multiplier, range_lo, range_lo] <- dup
+        # [halt, start, end, total, range_lo, multiplier, multiplier, range_lo] <- roll depth=4 rolls=1
+        # [halt, start, end, total, range_lo, multiplier, multiplier * range_lo] <- mul
+        # [halt, start, total, range_lo, multiplier, multiplier * range_lo, end] <- roll depth=5 rolls=4
+        # [halt, start, total, range_lo, multiplier, multiplier * range_lo, end, end] <- dup
+        # [halt, start, end, total, range_lo, multiplier, multiplier * range_lo, end] <- roll depth=6 rolls=1
 
         if range_lo * multiplier > end: # no further ranges intersect the search range
             break
 
-        lo_multiple = ceildiv(start, multiplier)
+        # [halt, start, end, total, range_lo, multiplier, multiplier, multiplier]
+
+        lo_multiple = ceildiv(start, multiplier) # (start + multiplier-1) / multiplier
         hi_multiple = floordiv(end, multiplier)
         # must sum multiples in the intersection between the ranges [lo_multiple, hi_multiple] and [range_lo, range_hi]
 
@@ -47,5 +60,80 @@ loop:
         total += (hi_multiple * (hi_multiple + 1) - (lo_multiple - 1) * lo_multiple) / 2 * multiplier
         range_lo *= 10
 
+#[halt, start, end, total]
+#[start, end, total, halt] <- roll depth=4 rolls=3
+#[start, end, total, halt, halt] <- dup
+#[halt, start, end, total, halt] <- roll depth=5 rolls=1
+#[halt, start, end, total] <- point
     if halt > 0:
         break
+
+out
+pop
+pop
+pop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
