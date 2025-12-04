@@ -33,24 +33,37 @@ out(total_jolts)
 
 ---------------------------------------------------------------------------------------------
 
-push 0
+push 0 # total_jolts
 loop:
     push '\n'
-    in
+    in # a
     if >'0': # nondefault value
         roll depth=2 rolls=1
         pop # remove default input
 
-        in
+        in # b
         loop: // todo
-            in
+            in # c
             if >'0':
                 # [total_jolts, a, b, c] on stack
 
-                if b > a:
+                roll depth=2 rolls=1
+                dup
+                roll depth=3 rolls=1
+                roll depth=4 rolls=3
+                dup
+                roll depth=5 rolls=1
+                # [total_jolts, a, b, c, b, a] on stack
+                if >:
                     roll depth=3 rolls=2
                     pop
-                elif c > b:
+
+                dup
+                roll depth=3 rolls=2
+                dup
+                roll depth=4 rolls=1
+                # [total_jolts, a, b, c, c, b] on stack
+                elif >:
                     roll depth=2 rolls=1
                     pop
 
