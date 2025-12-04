@@ -45,21 +45,22 @@ int has_repeating_subsequence(uint64_t id) {
     uint64_t subseq_mask = 10;
     for (int subseq_len = 1; subseq_len <= max_subseq_len; subseq_len++) {
         uint64_t subseq = id % subseq_mask;
-        if (subseq < subseq_mask / 10) continue; // subsequence must start with nonzero digit because IDs never start with 0
 
-        uint64_t remaining_seq = id / subseq_mask;
-        int is_repeating = 1;
-        while (remaining_seq != 0) {
-            if (remaining_seq % subseq_mask != subseq) {
-                is_repeating = 0;
-                break;
+        if (subseq >= subseq_mask / 10) { // subsequence must start with nonzero digit because IDs never start with 0
+            uint64_t remaining_seq = id / subseq_mask;
+            int is_repeating = 1;
+            while (remaining_seq != 0) {
+                if (remaining_seq % subseq_mask != subseq) {
+                    is_repeating = 0;
+                    break;
+                }
+
+                remaining_seq /= subseq_mask;
             }
 
-            remaining_seq /= subseq_mask;
-        }
-
-        if (is_repeating) {
-            return 1;
+            if (is_repeating) {
+                return 1;
+            }
         }
 
         subseq_mask *= 10;
