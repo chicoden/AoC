@@ -45,7 +45,7 @@ int has_repeating_subsequence(uint64_t id) {
     uint64_t subseq_mask = 10;
     for (int subseq_len = 1; subseq_len <= max_subseq_len; subseq_len++) {
         uint64_t subseq = id % subseq_mask;
-        //
+        if (subseq < subseq_mask / 10) continue; // subsequence must start with nonzero digit because IDs never start with 0
 
         uint64_t remaining_seq = id / subseq_mask;
         int is_repeating = 1;
@@ -90,14 +90,13 @@ int main() {
 
         int delimiter = fgetc(file);
         expecting_range = delimiter == ',';
-        if (!expecting_range && delimiter != '\n' && delimiter != '\r') {
+        if (!expecting_range && delimiter != '\n' && delimiter != '\r') { // check for carriage return because windows
             puts("expected newline");
             break;
         }
 
         for (uint64_t id = start; id <= end; id++) {
             if (has_repeating_subsequence(id)) {
-                printf("%llu\n", id);///
                 total += id;
             }
         }
