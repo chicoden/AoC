@@ -42,7 +42,7 @@ loop:
         pop # remove default input
 
         in # b
-        loop: // todo
+        loop:
             in # c
             if >'0':
                 # [total_jolts, a, b, c] on stack
@@ -66,6 +66,9 @@ loop:
                 elif >:
                     roll depth=2 rolls=1
                     pop
+
+                else:
+                    pop # discard c since it went unused
 
             else:
                 pop
