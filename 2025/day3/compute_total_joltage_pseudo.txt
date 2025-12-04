@@ -1,0 +1,35 @@
+a = max(bank[:-1])                  # first battery
+b = max(bank[bank.index(first)+1:]) # second battery
+
+---------------------------------------------------------------------------------------------
+
+total_jolts = 0
+
+loop:
+    a = in()
+    if eof():
+        break
+
+    b = in()
+    loop:
+        c = in()
+        if c == '\n':
+            break
+
+        # a is most significant so try to increase its power first
+        # cannot replace it with c yet because b must come after it and we haven't read past c
+        if b > a:
+            a = b # move b to a because it is more powerful
+            b = c # b was moved so replace it with c
+
+        # otherwise, still haven't used c so try increasing the power of b
+        # note that this means that it may be able to increase a if there are more batteries left in the bank
+        elif c > b:
+            b = c
+
+    total_jolts += (a - '0') * 10 + (b - '0')
+
+out(total_jolts)
+
+---------------------------------------------------------------------------------------------
+
