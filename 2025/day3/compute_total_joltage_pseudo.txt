@@ -42,7 +42,7 @@ loop:
         pop # remove default input
 
         in
-        loop:
+        loop: // todo
             in
             if >'0':
                 # [total_jolts, a, b, c] on stack
