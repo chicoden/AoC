@@ -18,11 +18,27 @@ calculate_button.onclick = async function() {
         bank_start = selection_end;
 
         while (true) {
-            let ch = input[bank_start++];
-            if (ch == 0x0D) continue; // skip carriage returns
-            if (ch == 0x0A) break; // newline delimits banks
+            let battery = input[bank_start++];
+            if (battery == 0x0D) continue; // skip carriage returns
+            if (battery == 0x0A) break; // newline delimits banks
 
-            //
+            let found_battery_to_promote = false;
+            for (let i = 1; i < selection.length; i++) {
+                if (selection[i] > selection[i - 1]) {
+                    // promote this battery and shift successive batteries back
+                    for (let j = i; j < selection.length; j++) {
+                        selection[j - 1] = selection[j];
+                    }
+
+                    found_battery_to_promote = true;
+                    break;
+                }
+            }
+
+            if (found_battery_to_promote || battery > selection[selection.length - 1]) {
+                // either last slot was emptied or needs to be replaced
+                selection[selection.length - 1] = battery;
+            }
         }
     }
 };
