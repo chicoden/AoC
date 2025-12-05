@@ -40,5 +40,15 @@ calculate_button.onclick = async function() {
                 selection[selection.length - 1] = battery;
             }
         }
+
+        let max_joltage_for_bank = 0;
+        for (let digit of selection) {
+            digit -= 0x30; // offset from ASCII '0'
+            max_joltage_for_bank = max_joltage_for_bank * 10 + digit;
+        }
+
+        total_joltage += max_joltage_for_bank;
     }
+
+    result_box.innerText = total_joltage.toString();
 };
