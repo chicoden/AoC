@@ -36,7 +36,7 @@ namespace io {
             size_t initial_length = buffer.length;
             while (true) {
                 int ch = this.getchar();
-                if (ch == 0x0A || ch < 0) { // newline or EOF
+                if (ch == '\n' || ch < 0) { // newline or EOF
                     return buffer.length - initial_length; // return line length
                 }
 
