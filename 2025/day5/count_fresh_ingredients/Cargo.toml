@@ -1,0 +1,7 @@
+[package]
+name = "count_fresh_ingredients"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+range-set-blaze = "0.4.1"
