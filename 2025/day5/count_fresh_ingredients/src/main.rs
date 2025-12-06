@@ -41,6 +41,7 @@ fn main() {
         }
 
         println!("Number of available ingredients that are fresh: {}", fresh_available_ingredient_count);
+        println!("Total number of fresh ingredients: {}", fresh_ids.len());
     } else {
         println!("failed to open input file");
         return;
