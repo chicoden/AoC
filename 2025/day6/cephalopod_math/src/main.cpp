@@ -11,11 +11,21 @@ struct QueueFamilyIndices {
     std::optional<uint32_t> compute;
 };
 
-VkResult create_vulkan_instance(VkInstance& instance);
+struct WorkData {
+    VkDeviceMemory memory_backing;
+    VkBuffer add_problems;
+    VkBuffer mul_problems;
+    VkBuffer summation_scratch;
+    uint32_t add_problem_count;
+    uint32_t mul_problem_count;
+    uint32_t total_problem_count;
+};
+
+bool create_vulkan_instance(VkInstance& instance);
 std::tuple<VkPhysicalDevice, QueueFamilyIndices> pick_physical_device(VkInstance instance);
 QueueFamilyIndices find_queue_family_indices(VkPhysicalDevice gpu);
-VkResult create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
-VkResult load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
+bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
+bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
 
 int main(int argc, char* argv[]) {
     if (argc != 2) { // first argument is implicit (the path of the executable)
@@ -24,7 +34,7 @@ int main(int argc, char* argv[]) {
     }
 
     VkInstance instance;
-    if (create_vulkan_instance(instance) != VK_SUCCESS) {
+    if (!create_vulkan_instance(instance)) {
         std::cout << "failed to create vulkan instance" << std::endl;
         return 0;
     }
@@ -37,7 +47,7 @@ int main(int argc, char* argv[]) {
     }
 
     VkDevice device;
-    if (create_logical_device(gpu, queue_family_indices, device) != VK_SUCCESS) {
+    if (!create_logical_device(gpu, queue_family_indices, device)) {
         std::cout << "failed to create logical device" << std::endl;
         vkDestroyInstance(instance, NULL);
         return 0;
@@ -46,23 +56,23 @@ int main(int argc, char* argv[]) {
     VkQueue compute_queue;
     vkGetDeviceQueue(device, queue_family_indices.compute.value(), 0, &compute_queue);
 
-    VkShaderModule cephalopod_math_shader;
-    if (load_shader_spv(device, cephalopod_math_shader, "src/shaders/cephalopod_math.spv") != VK_SUCCESS) {
-        std::cout << "failed to load shader module" << std::endl;
+    VkShaderModule math_shader;
+    if (!load_shader_spv(device, math_shader, "shaders/cephalopod_math.spv")) {
+        std::cout << "failed to create shader module" << std::endl;
         vkDestroyDevice(device, NULL);
         vkDestroyInstance(instance, NULL);
         return 0;
     }
 
-    std::cout << cephalopod_math_shader << std::endl;///
+    std::cout << math_shader << std::endl;//
 
-    vkDestroyShaderModule(device, cephalopod_math_shader, NULL);
+    vkDestroyShaderModule(device, math_shader, NULL);
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);
     return 0;
 }
 
-VkResult create_vulkan_instance(VkInstance& instance) {
+bool create_vulkan_instance(VkInstance& instance) {
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "AoC 2025 - Day 6 Part 1";
@@ -79,7 +89,7 @@ VkResult create_vulkan_instance(VkInstance& instance) {
     create_info.enabledLayerCount = 0;
     create_info.ppEnabledLayerNames = NULL;
 
-    return vkCreateInstance(&create_info, NULL, &instance);
+    return vkCreateInstance(&create_info, NULL, &instance) == VK_SUCCESS;
 }
 
 std::tuple<VkPhysicalDevice, QueueFamilyIndices> pick_physical_device(VkInstance instance) {
@@ -147,7 +157,7 @@ QueueFamilyIndices find_queue_family_indices(VkPhysicalDevice gpu) {
     return queue_family_indices;
 }
 
-VkResult create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device) {
+bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device) {
     std::vector<uint32_t> unique_queue_family_indices = {queue_family_indices.compute.value()};
 
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos(unique_queue_family_indices.size());
@@ -170,12 +180,12 @@ VkResult create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& q
     create_info.enabledExtensionCount = 0;
     create_info.ppEnabledExtensionNames = NULL;
 
-    return vkCreateDevice(gpu, &create_info, NULL, &device);
+    return vkCreateDevice(gpu, &create_info, NULL, &device) == VK_SUCCESS;
 }
 
-VkResult load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path) {
+bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) return VK_ERROR_UNKNOWN;
+    if (!file.is_open()) return false;
 
     size_t file_size = file.tellg(); // opened with read pointer at the end so tellg() gives the size in bytes
     file.seekg(0); // return file pointer to the start
@@ -188,7 +198,11 @@ VkResult load_shader_spv(VkDevice device, VkShaderModule& shader_module, const c
     create_info.codeSize = code.size();
     create_info.pCode = reinterpret_cast<uint32_t*>(code.data());
 
-    return vkCreateShaderModule(device, &create_info, NULL, &shader_module);
+    return vkCreateShaderModule(device, &create_info, NULL, &shader_module) == VK_SUCCESS;
 }
 
-//
+/*VkResult load_math_problems(VkDevice device, WorkData& work_data, const char* path) {
+    //read file
+    //allocate memory
+    //create buffers and bind to memory
+}*/

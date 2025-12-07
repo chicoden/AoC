@@ -5,10 +5,11 @@ project(CephalopodMath)
     find_package(Vulkan 1.3 REQUIRED)
 
     file(GLOB shader_sources "shaders/*.glsl.*")
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/shaders)
     set(shader_binaries "")
     foreach(shader_source_in ${shader_sources})
         get_filename_component(shader_name ${shader_source_in} NAME_WE)
-        set(shader_binary_out "${CMAKE_SOURCE_DIR}/shaders/${shader_name}.spv")
+        set(shader_binary_out "${CMAKE_BINARY_DIR}/shaders/${shader_name}.spv")
 
         add_custom_command(
             OUTPUT ${shader_binary_out}
