@@ -15,6 +15,7 @@ VkResult create_vulkan_instance(VkInstance& instance);
 std::tuple<VkPhysicalDevice, QueueFamilyIndices> pick_physical_device(VkInstance instance);
 QueueFamilyIndices find_queue_family_indices(VkPhysicalDevice gpu);
 VkResult create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
+VkResult load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
 
 int main(int argc, char* argv[]) {
     if (argc != 2) { // first argument is implicit (the path of the executable)
@@ -45,8 +46,17 @@ int main(int argc, char* argv[]) {
     VkQueue compute_queue;
     vkGetDeviceQueue(device, queue_family_indices.compute.value(), 0, &compute_queue);
 
-    //
+    VkShaderModule cephalopod_math_shader;
+    if (load_shader_spv(device, cephalopod_math_shader, "src/shaders/cephalopod_math.spv") != VK_SUCCESS) {
+        std::cout << "failed to load shader module" << std::endl;
+        vkDestroyDevice(device, NULL);
+        vkDestroyInstance(instance, NULL);
+        return 0;
+    }
 
+    std::cout << cephalopod_math_shader << std::endl;///
+
+    vkDestroyShaderModule(device, cephalopod_math_shader, NULL);
     vkDestroyDevice(device, NULL);
     vkDestroyInstance(instance, NULL);
     return 0;
@@ -162,3 +172,23 @@ VkResult create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& q
 
     return vkCreateDevice(gpu, &create_info, NULL, &device);
 }
+
+VkResult load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path) {
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
+    if (!file.is_open()) return VK_ERROR_UNKNOWN;
+
+    size_t file_size = file.tellg(); // opened with read pointer at the end so tellg() gives the size in bytes
+    file.seekg(0); // return file pointer to the start
+
+    std::vector<char> code(file_size);
+    file.read(code.data(), file_size);
+
+    VkShaderModuleCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.codeSize = code.size();
+    create_info.pCode = reinterpret_cast<uint32_t*>(code.data());
+
+    return vkCreateShaderModule(device, &create_info, NULL, &shader_module);
+}
+
+//
