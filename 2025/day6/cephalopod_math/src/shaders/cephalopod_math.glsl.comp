@@ -1,6 +1,47 @@
 #version 450
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+#extension GL_EXT_buffer_reference : require
 
-layout(local_size_x = 4) in;
+layout(local_size_x = 32) in;
+
+layout(buffer_reference) buffer PtrU32 { uint32_t deref; };
+layout(buffer_reference) buffer PtrU64 { uint64_t deref; };
+
+layout(std430, push_constant) uniform PushConstants {
+    PtrU32 problems;
+    PtrU64 results;
+    uint32_t problem_stride;
+    uint32_t opcode;
+};
+
+const uint32_t SIZEOF_U32 = 4;
+const uint32_t SIZEOF_U64 = 8;
+
+const uint32_t OP_ADD = 0;
+const uint32_t OP_MUL = 1;
 
 void main() {
+    uint32_t problem_id = gl_GlobalInvocationID.x;
+    uint64_t problem_start = uint64_t(problems) + problem_id * problem_stride;
+    uint64_t problem_end = problem_start + problem_stride;
+
+    uint64_t result;
+    switch (opcode) {
+        case OP_ADD: {
+            result = 0;
+            for (uint64_t value_ptr = problem_start; value_ptr != problem_end; value_ptr += SIZEOF_U32) {
+                result += PtrU32(value_ptr).deref;
+            } break;
+        }
+
+        case OP_MUL: {
+            result = 1;
+            for (uint64_t value_ptr = problem_start; value_ptr != problem_end; value_ptr += SIZEOF_U32) {
+                result *= PtrU32(value_ptr).deref;
+            } break;
+        }
+    }
+
+    uint64_t result_ptr = uint64_t(results) + problem_id * SIZEOF_U64;
+    PtrU64(result_ptr).deref = result;
 }
