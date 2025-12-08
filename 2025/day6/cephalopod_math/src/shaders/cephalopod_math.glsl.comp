@@ -11,6 +11,7 @@ layout(std430, push_constant) uniform PushConstants {
     PtrU32 problems;
     PtrU64 results;
     uint32_t problem_stride;
+    uint32_t problem_count;
     uint32_t opcode;
 };
 
@@ -22,6 +23,8 @@ const uint32_t OP_MUL = 1;
 
 void main() {
     uint32_t problem_id = gl_GlobalInvocationID.x;
+    if (problem_id >= problem_count) return;
+
     uint64_t problem_start = uint64_t(problems) + problem_id * problem_stride;
     uint64_t problem_end = problem_start + problem_stride;
 

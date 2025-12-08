@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <array>
 #include <vector>
 #include <tuple>
 #include <string>
@@ -15,16 +14,34 @@
 #define VMA_VULKAN_VERSION 1003000 // Vulkan 1.3
 #include "vk_mem_alloc.h"
 
+const uint32_t OP_ADD = 0;
+const uint32_t OP_MUL = 1;
+const uint32_t WORKGROUP_SIZE = 32;
+
 struct QueueFamilyIndices {
     std::optional<uint32_t> compute;
 };
 
-bool create_vulkan_instance(VkInstance& instance);
+struct PushConstants {
+    VkDeviceAddress problems;
+    VkDeviceAddress results;
+    uint32_t problem_stride;
+    uint32_t problem_count;
+    uint32_t opcode;
+};
+
+bool create_vulkan_instance(VkInstance& instance, const char* app_name);
 std::tuple<VkPhysicalDevice, QueueFamilyIndices> pick_physical_device(VkInstance instance);
 QueueFamilyIndices find_queue_family_indices(VkPhysicalDevice gpu);
 bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
 bool create_vma_allocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VmaAllocator& allocator);
 bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
+bool create_buffer(VmaAllocator allocator, size_t size, VkBuffer& buffer, VmaAllocation& allocation);
+bool create_pipeline_layout(VkDevice device, VkPipelineLayout& pipeline_layout);
+bool create_compute_pipeline(VkDevice device, VkPipelineLayout pipeline_layout, VkShaderModule shader_module, VkPipeline& pipeline);
+bool create_command_pool(VkDevice device, uint32_t queue_family_index, VkCommandPool& command_pool);
+bool allocate_command_buffer(VkDevice device, VkCommandPool command_pool, VkCommandBufferLevel level, VkCommandBuffer& command_buffer);
+bool create_fence(VkDevice device, bool create_signalled, VkFence& fence);
 
 int main(int argc, char* argv[]) {
     if (argc != 2) { // first argument is implicit (the path of the executable)
@@ -33,7 +50,7 @@ int main(int argc, char* argv[]) {
     }
 
     VkInstance instance;
-    if (!create_vulkan_instance(instance)) {
+    if (!create_vulkan_instance(instance, "AoC 2025 - Day 6 Part 1")) {
         std::cout << "failed to create instance" << std::endl;
         return 0;
     } Housekeeper cleanup_instance([instance]() {
@@ -55,6 +72,9 @@ int main(int argc, char* argv[]) {
         vkDestroyDevice(device, NULL);
         std::cout << "destroyed logical device" << std::endl;
     });
+
+    VkQueue compute_queue;
+    vkGetDeviceQueue(device, queue_family_indices.compute.value(), 0, &compute_queue);
 
     VmaAllocator allocator;
     if (!create_vma_allocator(instance, gpu, device, allocator)) {
@@ -90,34 +110,152 @@ int main(int argc, char* argv[]) {
     std::string::iterator ops_end = std::remove(ops_line.begin(), ops_line.end(), ' ');
     std::string_view ops = std::string_view(ops_line.begin(), ops_end);
 
-    uint32_t add_problem_count = 0;
-    uint32_t mul_problem_count = 0;
-    for (char op : ops) {
-        switch (op) {
-            case '+': {
-                add_problem_count++;
-                break;
-            }
-
-            case '*': {
-                mul_problem_count++;
-                break;
-            }
-        }
-    }
-
-    uint32_t total_problem_count = add_problem_count + mul_problem_count;
+    uint32_t add_problem_count = std::count(ops.begin(), ops.end(), '+');
+    uint32_t mul_problem_count = std::count(ops.begin(), ops.end(), '*');
+    uint32_t total_problem_count = ops.size();
     uint32_t values_per_problem = lines.size() - 1; // numbers for each problem are arranged vertically
 
-    // create buffers
+    // compute offsets for ranges of problems and results in the gpu buffer
+    uint32_t add_problems_offset = 0;
+    uint32_t mul_problems_offset = add_problems_offset + add_problem_count * sizeof(uint32_t);
+    uint32_t add_results_offset = (mul_problems_offset + mul_problem_count * sizeof(uint32_t) + 7) / 8 * 8; // round up to an alignment of 8
+    uint32_t mul_results_offset =   add_results_offset + add_problem_count * sizeof(uint64_t);
+    uint32_t buffer_size =          mul_results_offset + mul_problem_count * sizeof(uint64_t);
+    uint32_t final_result_offset = add_results_offset;
 
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    if (!create_buffer(allocator, buffer_size, buffer, allocation)) {
+        std::cout << "failed to allocate buffer" << std::endl;
+        return 0;
+    } Housekeeper cleanup_buffer([allocator, buffer, allocation]() {
+        vmaDestroyBuffer(allocator, buffer, allocation);
+        std::cout << "destroyed buffer" << std::endl;
+    });
+
+    VkBufferDeviceAddressInfo bda_info{};
+    bda_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+    bda_info.buffer = buffer;
+    VkDeviceAddress buffer_address = vkGetBufferDeviceAddress(device, &bda_info);
+
+    {
+        void* data;
+        if (vmaMapMemory(allocator, allocation, &data) != VK_SUCCESS) {
+            std::cout << "failed to map buffer" << std::endl;
+            return 0;
+        }
+
+        // write problem data into mapped buffer
+        uint32_t* values = reinterpret_cast<uint32_t*>(data);
+        /*for (char op : ops) {
+        }*/
+        ///
+
+        vmaUnmapMemory(allocator, allocation);
+    }
+
+    VkPipelineLayout pipeline_layout;
+    if (!create_pipeline_layout(device, pipeline_layout)) {
+        std::cout << "failed to create pipeline layout" << std::endl;
+        return 0;
+    } Housekeeper cleanup_pipeline_layout([device, pipeline_layout]() {
+        vkDestroyPipelineLayout(device, pipeline_layout, NULL);
+        std::cout << "destroyed pipeline layout" << std::endl;
+    });
+
+    VkPipeline pipeline;
+    if (!create_compute_pipeline(device, pipeline_layout, math_shader, pipeline)) {
+        std::cout << "failed to create compute pipeline" << std::endl;
+        return 0;
+    } Housekeeper cleanup_pipeline([device, pipeline]() {
+        vkDestroyPipeline(device, pipeline, NULL);
+        std::cout << "destroyed compute pipeline" << std::endl;
+    });
+
+    VkCommandPool command_pool;
+    if (!create_command_pool(device, queue_family_indices.compute.value(), command_pool)) {
+        std::cout << "failed to create command pool" << std::endl;
+        return 0;
+    } Housekeeper cleanup_command_pool([device, command_pool]() {
+        vkDestroyCommandPool(device, command_pool, NULL);
+        std::cout << "destroyed command pool" << std::endl;
+    });
+
+    VkCommandBuffer command_buffer;
+    if (!allocate_command_buffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, command_buffer)) {
+        std::cout << "failed to allocate command buffer" << std::endl;
+        return 0;
+    } // automatically freed when the owning command pool is destroyed
+
+    VkFence work_complete_fence;
+    if (!create_fence(device, false, work_complete_fence)) {
+        std::cout << "failed to create fence" << std::endl;
+        return 0;
+    } Housekeeper cleanup_work_complete_fence([device, work_complete_fence]() {
+        vkDestroyFence(device, work_complete_fence, NULL);
+        std::cout << "destroyed fence" << std::endl;
+    });
+
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
+        std::cout << "failed to begin command buffer" << std::endl;
+        return 0;
+    }
+
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    PushConstants push_constants;
+    push_constants.problem_stride = values_per_problem * sizeof(uint32_t);
+
+    push_constants.problems = buffer_address + add_problems_offset;
+    push_constants.results = buffer_address + add_results_offset;
+    push_constants.problem_count = add_problem_count;
+    push_constants.opcode = OP_ADD;
+    vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants), &push_constants);
+    vkCmdDispatch(command_buffer, (add_problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1, 1);
+
+    if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
+        std::cout << "failed to end command buffer" << std::endl;
+        return 0;
+    }
+
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+
+    if (vkQueueSubmit(compute_queue, 1, &submit_info, work_complete_fence) != VK_SUCCESS) {
+        std::cout << "failed to submit command buffer" << std::endl;
+        return 0;
+    }
+
+    if (vkWaitForFences(device, 1, &work_complete_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+        std::cout << "failed to wait on fence" << std::endl;
+        return 0;
+    }
+
+    uint64_t result;
+    {
+        void* data;
+        if (vmaMapMemory(allocator, allocation, &data) != VK_SUCCESS) {
+            std::cout << "failed to map buffer" << std::endl;
+            return 0;
+        }
+
+        // read final result out from mapped buffer
+        result = *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(data) + final_result_offset);
+
+        vmaUnmapMemory(allocator, allocation);
+    }
+
+    std::cout << "Result: " << result << std::endl;
     return 0;
 }
 
-bool create_vulkan_instance(VkInstance& instance) {
+bool create_vulkan_instance(VkInstance& instance, const char* app_name) {
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.pApplicationName = "AoC 2025 - Day 6 Part 1";
+    app_info.pApplicationName = app_name;
     app_info.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
     app_info.pEngineName = "No Engine";
     app_info.engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
@@ -246,6 +384,7 @@ bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue
 bool create_vma_allocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VmaAllocator& allocator) {
     VmaAllocatorCreateInfo create_info{};
     create_info.vulkanApiVersion = VK_API_VERSION_1_3;
+    create_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     create_info.instance = instance;
     create_info.physicalDevice = gpu;
     create_info.device = device;
@@ -268,4 +407,68 @@ bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char*
     create_info.pCode = reinterpret_cast<uint32_t*>(code.data());
 
     return vkCreateShaderModule(device, &create_info, NULL, &shader_module) == VK_SUCCESS;
+}
+
+bool create_buffer(VmaAllocator allocator, size_t size, VkBuffer& buffer, VmaAllocation& allocation) {
+    VkBufferCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    create_info.size = size;
+    create_info.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    alloc_info.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+    return vmaCreateBuffer(allocator, &create_info, &alloc_info, &buffer, &allocation, NULL) == VK_SUCCESS;
+}
+
+bool create_pipeline_layout(VkDevice device, VkPipelineLayout& pipeline_layout) {
+    VkPushConstantRange push_constants_range{};
+    push_constants_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    push_constants_range.offset = 0;
+    push_constants_range.size = sizeof(PushConstants);
+
+    VkPipelineLayoutCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    create_info.pushConstantRangeCount = 1;
+    create_info.pPushConstantRanges = &push_constants_range;
+
+    return vkCreatePipelineLayout(device, &create_info, NULL, &pipeline_layout) == VK_SUCCESS;
+}
+
+bool create_compute_pipeline(VkDevice device, VkPipelineLayout pipeline_layout, VkShaderModule shader_module, VkPipeline& pipeline) {
+    VkComputePipelineCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    create_info.layout = pipeline_layout;
+    create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    create_info.stage.module = shader_module;
+    create_info.stage.pName = "main";
+    return vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline) == VK_SUCCESS;
+}
+
+bool create_command_pool(VkDevice device, uint32_t queue_family_index, VkCommandPool& command_pool) {
+    VkCommandPoolCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    create_info.queueFamilyIndex = queue_family_index;
+    return vkCreateCommandPool(device, &create_info, NULL, &command_pool) == VK_SUCCESS;
+}
+
+bool allocate_command_buffer(VkDevice device, VkCommandPool command_pool, VkCommandBufferLevel level, VkCommandBuffer& command_buffer) {
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = command_pool;
+    alloc_info.level = level;
+    alloc_info.commandBufferCount = 1;
+    return vkAllocateCommandBuffers(device, &alloc_info, &command_buffer) == VK_SUCCESS;
+}
+
+bool create_fence(VkDevice device, bool create_signalled, VkFence& fence) {
+    VkFenceCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    if (create_signalled) create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    return vkCreateFence(device, &create_info, NULL, &fence) == VK_SUCCESS;
 }
