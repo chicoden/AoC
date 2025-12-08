@@ -3,9 +3,12 @@
 #include <vector>
 #include <tuple>
 #include <string>
+#include <string_view>
 #include <optional>
 #include <utility>
+#include <algorithm>
 #include <vulkan/vulkan.h>
+#include "housekeeper.hpp"
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> compute;
@@ -35,40 +38,39 @@ int main(int argc, char* argv[]) {
 
     VkInstance instance;
     if (!create_vulkan_instance(instance)) {
-        std::cout << "failed to create vulkan instance" << std::endl;
+        std::cout << "failed to create instance" << std::endl;
         return 0;
-    }
+    } Housekeeper cleanup_instance([instance]() {
+        vkDestroyInstance(instance, NULL);
+        std::cout << "destroyed instance" << std::endl;
+    });
 
     auto [gpu, queue_family_indices] = pick_physical_device(instance);
     if (gpu == VK_NULL_HANDLE) {
         std::cout << "no suitable gpu found" << std::endl;
-        vkDestroyInstance(instance, NULL);
         return 0;
     }
 
     VkDevice device;
     if (!create_logical_device(gpu, queue_family_indices, device)) {
         std::cout << "failed to create logical device" << std::endl;
-        vkDestroyInstance(instance, NULL);
         return 0;
-    }
-
-    VkQueue compute_queue;
-    vkGetDeviceQueue(device, queue_family_indices.compute.value(), 0, &compute_queue);
+    } Housekeeper cleanup_device([device]() {
+        vkDestroyDevice(device, NULL);
+        std::cout << "destroyed logical device" << std::endl;
+    });
 
     VkShaderModule math_shader;
     if (!load_shader_spv(device, math_shader, "shaders/cephalopod_math.spv")) {
-        std::cout << "failed to create shader module" << std::endl;
-        vkDestroyDevice(device, NULL);
-        vkDestroyInstance(instance, NULL);
+        std::cout << "failed to load shader binary" << std::endl;
         return 0;
-    }
+    } Housekeeper cleanup_math_shader([device, math_shader]() {
+        vkDestroyShaderModule(device, math_shader, NULL);
+        std::cout << "destroyed shader module" << std::endl;
+    });
 
-    std::cout << math_shader << std::endl;//
+    std::cout << math_shader << std::endl;///
 
-    vkDestroyShaderModule(device, math_shader, NULL);
-    vkDestroyDevice(device, NULL);
-    vkDestroyInstance(instance, NULL);
     return 0;
 }
 
@@ -201,8 +203,18 @@ bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char*
     return vkCreateShaderModule(device, &create_info, NULL, &shader_module) == VK_SUCCESS;
 }
 
-/*VkResult load_math_problems(VkDevice device, WorkData& work_data, const char* path) {
-    //read file
-    //allocate memory
-    //create buffers and bind to memory
+/*bool load_math_problems(VkDevice device, WorkData& work_data, const char* path) {
+    std::ifstream file(path);
+    if (!file.is_open()) return false;
+
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(std::move(line));
+    }
+
+    std::string& ops_line = lines.back();
+    const std::string::iterator ops_end = std::remove(ops_line.begin(), ops_line.end(), ' ');
+    const std::string_view ops = std::string_view(ops_line.begin(), ops_end);
+    std::cout << '"' << ops << '"' << std::endl;
 }*/

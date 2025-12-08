@@ -25,7 +25,7 @@ project(CephalopodMath)
         DEPENDS ${shader_binaries}
     )
 
-    include_directories(${Vulkan_INCLUDE_DIRS})
+    include_directories(${Vulkan_INCLUDE_DIRS} ../include)
     add_executable(CephalopodMath main.cpp)
     add_dependencies(CephalopodMath compile_shaders)
     target_link_libraries(CephalopodMath ${Vulkan_LIBRARIES})
