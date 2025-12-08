@@ -4,8 +4,8 @@
 
 layout(local_size_x = 32) in;
 
-layout(buffer_reference) buffer PtrU32 { uint32_t deref; };
-layout(buffer_reference) buffer PtrU64 { uint64_t deref; };
+layout(buffer_reference, buffer_reference_align = 4) buffer PtrU32 { uint32_t deref; };
+layout(buffer_reference, buffer_reference_align = 8) buffer PtrU64 { uint64_t deref; };
 
 layout(std430, push_constant) uniform PushConstants {
     PtrU32 problems;
