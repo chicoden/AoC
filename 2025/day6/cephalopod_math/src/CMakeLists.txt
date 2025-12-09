@@ -26,6 +26,7 @@ project(CephalopodMath)
     )
 
     include_directories(${Vulkan_INCLUDE_DIRS} ../include)
-    add_executable(CephalopodMath main.cpp)
+    file(GLOB sources "*.cpp")
+    add_executable(CephalopodMath ${sources})
     add_dependencies(CephalopodMath compile_shaders)
     target_link_libraries(CephalopodMath ${Vulkan_LIBRARIES})
