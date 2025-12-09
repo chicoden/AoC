@@ -114,3 +114,53 @@ VkDeviceAddress get_buffer_device_address(VkDevice device, VkBuffer buffer) {
     };
     return vkGetBufferDeviceAddress(device, &bda_info);
 }
+
+std::tuple<VkPipelineLayout, VkResult> create_pipeline_layout(
+    VkDevice device,
+    const std::vector<VkDescriptorSetLayout>& descriptor_set_layouts,
+    const std::vector<VkPushConstantRange>& push_constant_ranges
+) {
+    VkPipelineLayoutCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .setLayoutCount = static_cast<uint32_t>(descriptor_set_layouts.size()),
+        .pSetLayouts = descriptor_set_layouts.data(),
+        .pushConstantRangeCount = static_cast<uint32_t>(push_constant_ranges.size()),
+        .pPushConstantRanges = push_constant_ranges.data()
+    };
+
+    VkPipelineLayout pipeline_layout;
+    VkResult result = vkCreatePipelineLayout(device, &create_info, nullptr, &pipeline_layout);
+    return std::make_tuple(pipeline_layout, result);
+}
+
+std::tuple<VkPipeline, VkResult> create_compute_pipeline(
+    VkDevice device,
+    VkPipelineLayout pipeline_layout,
+    VkShaderModule shader_module,
+    const char* entrypoint,
+    const VkSpecializationInfo* specialization_info
+) {
+    VkComputePipelineCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .stage = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = shader_module,
+            .pName = entrypoint,
+            .pSpecializationInfo = specialization_info
+        },
+        .layout = pipeline_layout,
+        .basePipelineHandle = VK_NULL_HANDLE,
+        .basePipelineIndex = 0
+    };
+
+    VkPipeline pipeline;
+    VkResult result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline);
+    return std::make_tuple(pipeline, result);
+}

@@ -109,6 +109,19 @@ int main(int argc, char* argv[]) {
     VK_CHECK(math_shader_status);
     DEFER(cleanup_math_shader, vkDestroyShaderModule(device, math_shader, nullptr));
 
+    VkPushConstantRange push_constant_range{
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = sizeof(PushConstants)
+    };
+    auto [pipeline_layout, pipeline_layout_status] = create_pipeline_layout(device, {}, {push_constant_range});
+    VK_CHECK(pipeline_layout_status);
+    DEFER(cleanup_pipeline_layout, vkDestroyPipelineLayout(device, pipeline_layout, nullptr));
+
+    auto [pipeline, pipeline_status] = create_compute_pipeline(device, pipeline_layout, math_shader, "main", nullptr);
+    VK_CHECK(pipeline_status);
+    DEFER(cleanup_pipeline, vkDestroyPipeline(device, pipeline, nullptr));
+
     std::ifstream input_file(argv[1]);
     if (!input_file.is_open()) {
         std::cout << "failed to open input file " << argv[1] << std::endl;

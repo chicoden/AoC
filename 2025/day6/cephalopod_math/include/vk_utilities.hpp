@@ -31,3 +31,15 @@ std::tuple<VkDevice, VkResult> create_logical_device(
 );
 std::tuple<VkShaderModule, VkResult> create_shader_module_from_file(VkDevice device, const char* path);
 VkDeviceAddress get_buffer_device_address(VkDevice device, VkBuffer buffer);
+std::tuple<VkPipelineLayout, VkResult> create_pipeline_layout(
+    VkDevice device,
+    const std::vector<VkDescriptorSetLayout>& descriptor_set_layouts,
+    const std::vector<VkPushConstantRange>& push_constant_ranges
+);
+std::tuple<VkPipeline, VkResult> create_compute_pipeline(
+    VkDevice device,
+    VkPipelineLayout pipeline_layout,
+    VkShaderModule shader_module,
+    const char* entrypoint,
+    const VkSpecializationInfo* specialization_info
+);
