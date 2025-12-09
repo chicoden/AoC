@@ -164,3 +164,46 @@ std::tuple<VkPipeline, VkResult> create_compute_pipeline(
     VkResult result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline);
     return std::make_tuple(pipeline, result);
 }
+
+std::tuple<VkCommandPool, VkResult> create_command_pool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queue_family_index) {
+    VkCommandPoolCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = flags,
+        .queueFamilyIndex = queue_family_index
+    };
+
+    VkCommandPool command_pool;
+    VkResult result = vkCreateCommandPool(device, &create_info, nullptr, &command_pool);
+    return std::make_tuple(command_pool, result);
+}
+
+std::tuple<VkCommandBuffer, VkResult> allocate_command_buffer(
+    VkDevice device,
+    VkCommandPool parent_command_pool,
+    VkCommandBufferLevel command_buffer_level
+) {
+    VkCommandBufferAllocateInfo alloc_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .pNext = nullptr,
+        .commandPool = parent_command_pool,
+        .level = command_buffer_level,
+        .commandBufferCount = 1
+    };
+
+    VkCommandBuffer command_buffer;
+    VkResult result = vkAllocateCommandBuffers(device, &alloc_info, &command_buffer);
+    return std::make_tuple(command_buffer, result);
+}
+
+std::tuple<VkFence, VkResult> create_fence(VkDevice device, bool create_signalled) {
+    VkFenceCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = create_signalled ? VK_FENCE_CREATE_SIGNALED_BIT : (VkFenceCreateFlags)0
+    };
+
+    VkFence fence;
+    VkResult result = vkCreateFence(device, &create_info, nullptr, &fence);
+    return std::make_tuple(fence, result);
+}

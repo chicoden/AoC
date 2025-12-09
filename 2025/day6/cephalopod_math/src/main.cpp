@@ -122,6 +122,18 @@ int main(int argc, char* argv[]) {
     VK_CHECK(pipeline_status);
     DEFER(cleanup_pipeline, vkDestroyPipeline(device, pipeline, nullptr));
 
+    auto [command_pool, command_pool_status] = create_command_pool(device, 0, queue_family_indices.compute.value());
+    VK_CHECK(command_pool_status);
+    DEFER(cleanup_command_pool, vkDestroyCommandPool(device, command_pool, nullptr)); // also frees any command buffers allocated from the pool
+
+    auto [command_buffer, command_buffer_status] = allocate_command_buffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    VK_CHECK(command_buffer_status);
+    // automatically freed when parent command pool is destroyed
+
+    auto [work_done_fence, work_done_fence_status] = create_fence(device, false);
+    VK_CHECK(work_done_fence_status);
+    DEFER(cleanup_work_done_fence, vkDestroyFence(device, work_done_fence, nullptr));
+
     std::ifstream input_file(argv[1]);
     if (!input_file.is_open()) {
         std::cout << "failed to open input file " << argv[1] << std::endl;
@@ -270,48 +282,6 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
 /*        vmaUnmapMemory(allocator, allocation);
     }
 
-    VkPipelineLayout pipeline_layout;
-    if (!create_pipeline_layout(device, pipeline_layout)) {
-        std::cout << "failed to create pipeline layout" << std::endl;
-        return 0;
-    } Housekeeper cleanup_pipeline_layout([device, pipeline_layout]() {
-        vkDestroyPipelineLayout(device, pipeline_layout, NULL);
-        std::cout << "destroyed pipeline layout" << std::endl;
-    });
-
-    VkPipeline pipeline;
-    if (!create_compute_pipeline(device, pipeline_layout, math_shader, pipeline)) {
-        std::cout << "failed to create compute pipeline" << std::endl;
-        return 0;
-    } Housekeeper cleanup_pipeline([device, pipeline]() {
-        vkDestroyPipeline(device, pipeline, NULL);
-        std::cout << "destroyed compute pipeline" << std::endl;
-    });
-
-    VkCommandPool command_pool;
-    if (!create_command_pool(device, queue_family_indices.compute.value(), command_pool)) {
-        std::cout << "failed to create command pool" << std::endl;
-        return 0;
-    } Housekeeper cleanup_command_pool([device, command_pool]() {
-        vkDestroyCommandPool(device, command_pool, NULL);
-        std::cout << "destroyed command pool" << std::endl;
-    });
-
-    VkCommandBuffer command_buffer;
-    if (!allocate_command_buffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, command_buffer)) {
-        std::cout << "failed to allocate command buffer" << std::endl;
-        return 0;
-    } // automatically freed when the owning command pool is destroyed
-
-    VkFence work_complete_fence;
-    if (!create_fence(device, false, work_complete_fence)) {
-        std::cout << "failed to create fence" << std::endl;
-        return 0;
-    } Housekeeper cleanup_work_complete_fence([device, work_complete_fence]() {
-        vkDestroyFence(device, work_complete_fence, NULL);
-        std::cout << "destroyed fence" << std::endl;
-    });
-
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
@@ -366,54 +336,5 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
 
     std::cout << "Result: " << result << std::endl;
     return 0;
-}
-
-bool create_pipeline_layout(VkDevice device, VkPipelineLayout& pipeline_layout) {
-    VkPushConstantRange push_constants_range{};
-    push_constants_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    push_constants_range.offset = 0;
-    push_constants_range.size = sizeof(PushConstants);
-
-    VkPipelineLayoutCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create_info.pushConstantRangeCount = 1;
-    create_info.pPushConstantRanges = &push_constants_range;
-
-    return vkCreatePipelineLayout(device, &create_info, NULL, &pipeline_layout) == VK_SUCCESS;
-}
-
-bool create_compute_pipeline(VkDevice device, VkPipelineLayout pipeline_layout, VkShaderModule shader_module, VkPipeline& pipeline) {
-    VkComputePipelineCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    create_info.layout = pipeline_layout;
-    create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    create_info.stage.module = shader_module;
-    create_info.stage.pName = "main";
-    return vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline) == VK_SUCCESS;
-}
-
-bool create_command_pool(VkDevice device, uint32_t queue_family_index, VkCommandPool& command_pool) {
-    VkCommandPoolCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    create_info.queueFamilyIndex = queue_family_index;
-    return vkCreateCommandPool(device, &create_info, NULL, &command_pool) == VK_SUCCESS;
-}
-
-bool allocate_command_buffer(VkDevice device, VkCommandPool command_pool, VkCommandBufferLevel level, VkCommandBuffer& command_buffer) {
-    VkCommandBufferAllocateInfo alloc_info{};
-    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    alloc_info.commandPool = command_pool;
-    alloc_info.level = level;
-    alloc_info.commandBufferCount = 1;
-    return vkAllocateCommandBuffers(device, &alloc_info, &command_buffer) == VK_SUCCESS;
-}
-
-bool create_fence(VkDevice device, bool create_signalled, VkFence& fence) {
-    VkFenceCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    if (create_signalled) create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    return vkCreateFence(device, &create_info, NULL, &fence) == VK_SUCCESS;
 }
 */

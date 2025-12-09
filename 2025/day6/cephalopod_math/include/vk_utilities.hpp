@@ -43,3 +43,10 @@ std::tuple<VkPipeline, VkResult> create_compute_pipeline(
     const char* entrypoint,
     const VkSpecializationInfo* specialization_info
 );
+std::tuple<VkCommandPool, VkResult> create_command_pool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queue_family_index);
+std::tuple<VkCommandBuffer, VkResult> allocate_command_buffer(
+    VkDevice device,
+    VkCommandPool parent_command_pool,
+    VkCommandBufferLevel command_buffer_level
+);
+std::tuple<VkFence, VkResult> create_fence(VkDevice device, bool create_signalled);
