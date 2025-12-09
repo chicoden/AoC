@@ -1,10 +1,16 @@
 #include <iostream>
+#include <fstream>
 #include <cstdint>
+#include <utility>
+#include <algorithm>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "housekeeper.hpp"
 #include "vk_utilities.hpp"
+#include "struct_builder.hpp"
 
 struct PushConstants {
     VkDeviceAddress problems;
@@ -88,6 +94,41 @@ int main(int argc, char* argv[]) {
     auto [math_shader, math_shader_status] = create_shader_module_from_file(device, "shaders/cephalopod_math.spv");
     VK_CHECK(math_shader_status);
     DEFER(cleanup_math_shader, vkDestroyShaderModule(device, math_shader, nullptr));
+
+    std::ifstream input_file(argv[1]);
+    if (!input_file.is_open()) {
+        std::cout << "failed to open input file " << argv[1] << std::endl;
+        return 0;
+    }
+
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(input_file, line)) {
+        lines.push_back(std::move(line));
+    }
+
+    std::string& ops_line = lines.back();
+    std::string::iterator ops_end = std::remove(ops_line.begin(), ops_line.end(), ' ');
+    std::string_view ops(ops_line.begin(), ops_end);
+
+    size_t add_problem_count = 0;
+    size_t mul_problem_count = 0;
+    for (char op : ops) {
+        switch (op) {
+            case '+': add_problem_count++; break;
+            case '*': mul_problem_count++; break;
+        }
+    }
+
+    size_t total_problem_count = ops.size();
+    size_t values_per_problem = lines.size() - 1; // problems are arranged vertically, the last line tells the operation
+
+    StructBuilder struct_builder;
+    size_t add_problems_offset = struct_builder.add<uint32_t>(add_problem_count * values_per_problem);
+    size_t mul_problems_offset = struct_builder.add<uint32_t>(mul_problem_count * values_per_problem);
+    size_t add_results_offset = struct_builder.add<uint64_t>(add_problem_count);
+    size_t mul_results_offset = struct_builder.add<uint64_t>(mul_problem_count);
+    size_t total_data_size = struct_builder.total_size();
 
     //
 
