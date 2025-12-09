@@ -28,10 +28,71 @@ struct QueueFamilyIndices {
     Queues get_queues(VkDevice device) const;
 };
 
+uint32_t calculate_gpu_score(VkPhysicalDevice gpu);
+
 const uint32_t WORKGROUP_SIZE = 32;
 const uint32_t OP_ADD = 0;
 const uint32_t OP_MUL = 1;
 const uint32_t OP_COMBINE_RESULTS = 2;
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) { // first argument is implicit (the path of the executable)
+        std::cout << "expected one argument, the input file" << std::endl;
+        return 0;
+    }
+
+    auto [instance, instance_status] = create_vulkan_instance(
+        "AoC 2025 - Day 6 Part 1",
+        VK_MAKE_API_VERSION(0, 1, 0, 0),
+        VK_API_VERSION_1_3,
+        {}, {}
+    );
+    VK_CHECK(instance_status);
+    DEFER(cleanup_instance, vkDestroyInstance(instance, nullptr));
+
+    VkPhysicalDevice gpu = pick_physical_device(instance, calculate_gpu_score);
+    if (gpu == VK_NULL_HANDLE) {
+        std::cout << "no suitable gpu found" << std::endl;
+        return 0;
+    }
+
+    QueueFamilyIndices queue_family_indices = QueueFamilyIndices::find(gpu);
+    if (!queue_family_indices.is_complete()) {
+        std::cout << "unable to find all required queue families" << std::endl;
+        return 0;
+    }
+
+    VkPhysicalDeviceBufferDeviceAddressFeatures enabled_bda_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+        .pNext = nullptr,
+        .bufferDeviceAddress = VK_TRUE
+    };
+
+    VkPhysicalDeviceFeatures2 enabled_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &enabled_bda_features,
+        .features = {
+            .shaderInt64 = VK_TRUE
+        }
+    };
+
+    auto [device, device_status] = create_logical_device(
+        gpu,
+        queue_family_indices.make_queue_create_infos(),
+        enabled_features, {}
+    );
+    VK_CHECK(device_status);
+    DEFER(cleanup_device, vkDestroyDevice(device, nullptr));
+    Queues queues = queue_family_indices.get_queues(device);
+
+    auto [math_shader, math_shader_status] = create_shader_module_from_file(device, "shaders/cephalopod_math.spv");
+    VK_CHECK(math_shader_status);
+    DEFER(cleanup_math_shader, vkDestroyShaderModule(device, math_shader, nullptr));
+
+    //
+
+    return 0;
+}
 
 uint32_t calculate_gpu_score(VkPhysicalDevice gpu) {
     VkPhysicalDeviceFeatures2 features;
@@ -107,74 +168,6 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
     return queues;
 }
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) { // first argument is implicit (the path of the executable)
-        std::cout << "expected one argument, the input file" << std::endl;
-        return 0;
-    }
-
-    auto [instance, instance_status] = create_vulkan_instance(
-        "AoC 2025 - Day 6 Part 1",
-        VK_MAKE_API_VERSION(0, 1, 0, 0),
-        VK_API_VERSION_1_3,
-        {}, {}
-    );
-    VK_CHECK(instance_status);
-    DEFER(cleanup_instance, vkDestroyInstance(instance, nullptr));
-
-    VkPhysicalDevice gpu = pick_physical_device(instance, calculate_gpu_score);
-    if (gpu == VK_NULL_HANDLE) {
-        std::cout << "no suitable gpu found" << std::endl;
-        return 0;
-    }
-
-    QueueFamilyIndices queue_family_indices = QueueFamilyIndices::find(gpu);
-    if (!queue_family_indices.is_complete()) {
-        std::cout << "unable to find all required queue families" << std::endl;
-        return 0;
-    }
-
-    VkPhysicalDeviceBufferDeviceAddressFeatures enabled_bda_features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-        .pNext = nullptr,
-        .bufferDeviceAddress = VK_TRUE
-    };
-
-    VkPhysicalDeviceFeatures2 enabled_features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &enabled_bda_features,
-        .features = {
-            .shaderInt64 = VK_TRUE
-        }
-    };
-
-    auto [device, device_status] = create_logical_device(
-        gpu,
-        queue_family_indices.make_queue_create_infos(),
-        enabled_features, {}
-    );
-    VK_CHECK(device_status);
-    DEFER(cleanup_device, vkDestroyDevice(device, nullptr));
-    Queues queues = queue_family_indices.get_queues(device);
-
-    auto [math_shader, math_shader_status] = create_shader_module_from_file(device, "shaders/cephalopod_math.spv");
-    VK_CHECK(math_shader_status);
-    DEFER(cleanup_math_shader, vkDestroyShaderModule(device, math_shader, nullptr));
-
-    auto [megabuffer, megabuffer_status] = create_buffer(
-        device,
-        16,
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        {queue_family_indices.compute.value()}
-    );
-    VK_CHECK(megabuffer_status);
-    DEFER(cleanup_megabuffer, vkDestroyBuffer(device, megabuffer, nullptr));
-
-    std::cout << megabuffer << std::endl;///
-
-    return 0;
-}
-
 /*#include <iostream>
 #include <fstream>
 #include <vector>
@@ -213,7 +206,7 @@ struct PushConstants {
 //bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
 //bool create_vma_allocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VmaAllocator& allocator);
 //bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
-bool create_buffer(VmaAllocator allocator, size_t size, VkBuffer& buffer, VmaAllocation& allocation);
+//bool create_buffer(VmaAllocator allocator, size_t size, VkBuffer& buffer, VmaAllocation& allocation);
 bool create_pipeline_layout(VkDevice device, VkPipelineLayout& pipeline_layout);
 bool create_compute_pipeline(VkDevice device, VkPipelineLayout pipeline_layout, VkShaderModule shader_module, VkPipeline& pipeline);
 bool create_command_pool(VkDevice device, uint32_t queue_family_index, VkCommandPool& command_pool);

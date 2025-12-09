@@ -25,7 +25,7 @@ std::tuple<VkInstance, VkResult> create_vulkan_instance(
 VkPhysicalDevice pick_physical_device(VkInstance instance, uint32_t score_gpu(VkPhysicalDevice gpu));
 std::tuple<VkDevice, VkResult> create_logical_device(
     VkPhysicalDevice gpu,
-    const std::vector<VkDeviceQueueCreateInfo> queue_create_infos,
+    const std::vector<VkDeviceQueueCreateInfo>& queue_create_infos,
     const VkPhysicalDeviceFeatures2& enabled_features,
     const std::vector<const char*>& enabled_extensions
 );
