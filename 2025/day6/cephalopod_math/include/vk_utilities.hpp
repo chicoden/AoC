@@ -50,3 +50,8 @@ std::tuple<VkCommandBuffer, VkResult> allocate_command_buffer(
     VkCommandBufferLevel command_buffer_level
 );
 std::tuple<VkFence, VkResult> create_fence(VkDevice device, bool create_signalled);
+VkResult begin_command_buffer(
+    VkCommandBuffer command_buffer,
+    VkCommandBufferUsageFlags usage_flags,
+    const VkCommandBufferInheritanceInfo* inheritance_info
+);

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <sstream>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "housekeeper.hpp"
@@ -140,15 +141,18 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(input_file, line)) {
-        lines.push_back(std::move(line));
+    std::vector<std::stringstream> lines;
+    std::string last_line;
+    std::getline(input_file, last_line);
+    while (true) {
+        std::string buffer_line;
+        if (!std::getline(input_file, buffer_line)) break;
+        lines.emplace_back(std::move(last_line));
+        last_line = std::move(buffer_line);
     }
 
-    std::string& ops_line = lines.back();
-    std::string::iterator ops_end = std::remove(ops_line.begin(), ops_line.end(), ' ');
-    std::string_view ops(ops_line.begin(), ops_end);
+    std::string::iterator ops_end = std::remove(last_line.begin(), last_line.end(), ' ');
+    std::string_view ops(last_line.begin(), ops_end);
 
     size_t add_problem_count = 0;
     size_t mul_problem_count = 0;
@@ -160,7 +164,7 @@ int main(int argc, char* argv[]) {
     }
 
     size_t total_problem_count = ops.size();
-    size_t values_per_problem = lines.size() - 1; // problems are arranged vertically, the last line tells the operation
+    size_t values_per_problem = lines.size();
 
     StructBuilder struct_builder;
     size_t add_problems_offset = struct_builder.add<uint32_t>(add_problem_count * values_per_problem);
@@ -186,7 +190,39 @@ int main(int argc, char* argv[]) {
         buffer_address = get_buffer_device_address(device, buffer);
     } DEFER(cleanup_buffer, vmaDestroyBuffer(allocator, buffer, buffer_allocation));
 
-    std::cout << "Allocated buffer: " << buffer_address << std::endl;
+    {
+        void* mapped_buffer;
+        VK_CHECK(vmaMapMemory(allocator, buffer_allocation, &mapped_buffer));
+        DEFER(unmap_buffer, vmaUnmapMemory(allocator, buffer_allocation));
+
+        uint32_t* add_problems = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + add_problems_offset);
+        uint32_t* mul_problems = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + mul_problems_offset);
+        size_t read_pointer = 0;
+        for (char op : ops) {
+            uint32_t* problem;
+            switch (op) {
+                case '+': {
+                    problem = add_problems;
+                    add_problems += values_per_problem;
+                    break;
+                }
+
+                case '*': {
+                    problem = mul_problems;
+                    mul_problems += values_per_problem;
+                    break;
+                }
+            }
+
+            for (std::stringstream& line : lines) {
+                line >> *(problem++);
+            }
+        }
+    }
+
+    VK_CHECK(begin_command_buffer(command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr));
+        std::cout << "record commands" << std::endl;///
+    VK_CHECK(vkEndCommandBuffer(command_buffer));
 
     return 0;
 }
@@ -266,22 +302,6 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
 }
 
 /*
-    {
-        void* data;
-        if (vmaMapMemory(allocator, allocation, &data) != VK_SUCCESS) {
-            std::cout << "failed to map buffer" << std::endl;
-            return 0;
-        }
-
-        // write problem data into mapped buffer
-        uint32_t* values = reinterpret_cast<uint32_t*>(data);
-        /*for (char op : ops) {
-        }*/
-        ///
-
-/*        vmaUnmapMemory(allocator, allocation);
-    }
-
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {

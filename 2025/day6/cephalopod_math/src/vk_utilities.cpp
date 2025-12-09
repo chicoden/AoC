@@ -207,3 +207,18 @@ std::tuple<VkFence, VkResult> create_fence(VkDevice device, bool create_signalle
     VkResult result = vkCreateFence(device, &create_info, nullptr, &fence);
     return std::make_tuple(fence, result);
 }
+
+VkResult begin_command_buffer(
+    VkCommandBuffer command_buffer,
+    VkCommandBufferUsageFlags usage_flags,
+    const VkCommandBufferInheritanceInfo* inheritance_info
+) {
+    VkCommandBufferBeginInfo begin_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext = nullptr,
+        .flags = usage_flags,
+        .pInheritanceInfo = inheritance_info
+    };
+
+    return vkBeginCommandBuffer(command_buffer, &begin_info);
+}
