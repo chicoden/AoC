@@ -20,26 +20,26 @@ const uint32_t SIZEOF_U64 = 8;
 
 const uint32_t OP_ADD = 0;
 const uint32_t OP_MUL = 1;
+const uint32_t OP_COMBINE_RESULTS = 2;
 
-void main() {
-    uint32_t problem_id = gl_GlobalInvocationID.x;
+void solve_math_problem(uint32_t problem_id) {
     if (problem_id >= problem_count) return;
 
-    uint64_t problem_start = uint64_t(problems) + problem_id * problem_stride;
-    uint64_t problem_end = problem_start + problem_stride;
+    uint64_t start_ptr = uint64_t(problems) + problem_id * problem_stride;
+    uint64_t end_ptr = start_ptr + problem_stride;
 
     uint64_t result;
     switch (opcode) {
         case OP_ADD: {
             result = 0;
-            for (uint64_t value_ptr = problem_start; value_ptr != problem_end; value_ptr += SIZEOF_U32) {
+            for (uint64_t value_ptr = start_ptr; value_ptr != end_ptr; value_ptr += SIZEOF_U32) {
                 result += PtrU32(value_ptr).deref;
             } break;
         }
 
         case OP_MUL: {
             result = 1;
-            for (uint64_t value_ptr = problem_start; value_ptr != problem_end; value_ptr += SIZEOF_U32) {
+            for (uint64_t value_ptr = start_ptr; value_ptr != end_ptr; value_ptr += SIZEOF_U32) {
                 result *= PtrU32(value_ptr).deref;
             } break;
         }
@@ -47,4 +47,12 @@ void main() {
 
     uint64_t result_ptr = uint64_t(results) + problem_id * SIZEOF_U64;
     PtrU64(result_ptr).deref = result;
+}
+
+void main() {
+    if (opcode != OP_COMBINE_RESULTS) {
+        solve_math_problem(gl_GlobalInvocationID.x);
+    } else {
+        // reduce results
+    }
 }

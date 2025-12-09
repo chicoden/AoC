@@ -13,3 +13,5 @@ public:
         this->cleanup();
     }
 };
+
+#define DEFER(label, cleanup) Housekeeper label([&]() { cleanup; })

@@ -1,5 +1,301 @@
 #include <iostream>
 #include <fstream>
+#include <cstdint>
+#include <optional>
+#include <tuple>
+#include <vector>
+#include <vulkan/vulkan.h>
+#include <vulkan/vk_enum_string_helper.h>
+#include "housekeeper.hpp"
+
+#define VK_CHECK(result) { \
+    VkResult _result = result; \
+    if (_result != VK_SUCCESS) { \
+        std::cout << "error on line " << __LINE__ << ": " << string_VkResult(_result) << std::endl; \
+        return 0; \
+    } \
+}
+
+struct PushConstants {
+    VkDeviceAddress problems;
+    VkDeviceAddress results;
+    uint32_t problem_stride;
+    uint32_t problem_count;
+    uint32_t opcode;
+};
+
+struct Queues {
+    VkQueue compute;
+};
+
+struct QueueFamilyIndices {
+    inline static const float DEFAULT_QUEUE_PRIORITY = 1.0f;
+    std::optional<uint32_t> compute;
+
+    static QueueFamilyIndices find(VkPhysicalDevice gpu);
+    bool is_complete() const;
+    std::vector<VkDeviceQueueCreateInfo> make_queue_create_infos() const;
+    Queues get_queues(VkDevice device) const;
+};
+
+std::tuple<VkInstance, VkResult> create_vulkan_instance(const char* app_name, uint32_t app_version, uint32_t vk_api_version);
+VkPhysicalDevice pick_physical_device(VkInstance instance, uint32_t score_gpu(VkPhysicalDevice gpu));
+std::tuple<VkDevice, VkResult> create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices);
+std::tuple<VkShaderModule, VkResult> create_shader_module_from_file(VkDevice device, const char* path);
+std::tuple<VkBuffer, VkResult> create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, const std::vector<uint32_t>& owning_queue_indices);
+
+const uint32_t WORKGROUP_SIZE = 32;
+const uint32_t OP_ADD = 0;
+const uint32_t OP_MUL = 1;
+const uint32_t OP_COMBINE_RESULTS = 2;
+
+uint32_t calculate_gpu_score(VkPhysicalDevice gpu) {
+    VkPhysicalDeviceFeatures2 features;
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    VkPhysicalDeviceBufferDeviceAddressFeatures bda_features;
+    bda_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+
+    features.pNext = &bda_features;
+    bda_features.pNext = nullptr;
+    vkGetPhysicalDeviceFeatures2(gpu, &features);
+
+    if (
+        features.features.shaderInt64 == VK_FALSE ||
+        bda_features.bufferDeviceAddress == VK_FALSE
+    ) { // required features
+        return 0;
+    }
+
+    VkPhysicalDeviceProperties2 properties;
+    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    properties.pNext = nullptr;
+    vkGetPhysicalDeviceProperties2(gpu, &properties);
+
+    switch (properties.properties.deviceType) {
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return 1000; // prefer discrete gpu
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return 100; // integrated gpu might be ok
+    }
+
+    return 0;
+}
+
+QueueFamilyIndices QueueFamilyIndices::find(VkPhysicalDevice gpu) {
+    uint32_t property_count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties2(gpu, &property_count, nullptr);
+    std::vector<VkQueueFamilyProperties2> properties(property_count, VkQueueFamilyProperties2{
+        .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2,
+        .pNext = nullptr
+    });
+    vkGetPhysicalDeviceQueueFamilyProperties2(gpu, &property_count, properties.data());
+
+    QueueFamilyIndices queue_family_indices{};
+    for (uint32_t index = 0; index < property_count; index++) {
+        const VkQueueFamilyProperties& property = properties[index].queueFamilyProperties;
+        if (property.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            queue_family_indices.compute = index;
+            break;
+        }
+    }
+
+    return queue_family_indices;
+}
+
+bool QueueFamilyIndices::is_complete() const {
+    return this->compute.has_value();
+}
+
+std::vector<VkDeviceQueueCreateInfo> QueueFamilyIndices::make_queue_create_infos() const {
+    std::vector<VkDeviceQueueCreateInfo> create_infos;
+    create_infos.emplace_back(
+        /* sType = */ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        /* pNext = */ nullptr,
+        /* flags = */ 0,
+        /* queueFamilyIndex = */ this->compute.value(),
+        /* queueCount = */ 1,
+        /* pQueuePriorities = */ &QueueFamilyIndices::DEFAULT_QUEUE_PRIORITY
+    );
+    return create_infos;
+}
+
+Queues QueueFamilyIndices::get_queues(VkDevice device) const {
+    Queues queues;
+    vkGetDeviceQueue(device, this->compute.value(), 0, &queues.compute);
+    return queues;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) { // first argument is implicit (the path of the executable)
+        std::cout << "expected one argument, the input file" << std::endl;
+        return 0;
+    }
+
+    auto [instance, instance_status] = create_vulkan_instance(
+        "AoC 2025 - Day 6 Part 1",
+        VK_MAKE_API_VERSION(0, 1, 0, 0),
+        VK_API_VERSION_1_3
+    );
+    VK_CHECK(instance_status);
+    DEFER(cleanup_instance, vkDestroyInstance(instance, nullptr));
+
+    VkPhysicalDevice gpu = pick_physical_device(instance, calculate_gpu_score);
+    if (gpu == VK_NULL_HANDLE) {
+        std::cout << "no suitable gpu found" << std::endl;
+        return 0;
+    }
+
+    QueueFamilyIndices queue_family_indices = QueueFamilyIndices::find(gpu);
+    if (!queue_family_indices.is_complete()) {
+        std::cout << "unable to find all required queue families" << std::endl;
+        return 0;
+    }
+
+    auto [device, device_status] = create_logical_device(gpu, queue_family_indices);
+    VK_CHECK(device_status);
+    DEFER(cleanup_device, vkDestroyDevice(device, nullptr));
+    Queues queues = queue_family_indices.get_queues(device);
+
+    auto [math_shader, math_shader_status] = create_shader_module_from_file(device, "shaders/cephalopod_math.spv");
+    VK_CHECK(math_shader_status);
+    DEFER(cleanup_math_shader, vkDestroyShaderModule(device, math_shader, nullptr));
+
+    auto [megabuffer, megabuffer_status] = create_buffer(
+        device,
+        16,
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        {queue_family_indices.compute.value()}
+    );
+    VK_CHECK(megabuffer_status);
+    DEFER(cleanup_megabuffer, vkDestroyBuffer(device, megabuffer, nullptr));
+
+    std::cout << megabuffer << std::endl;///
+
+    return 0;
+}
+
+std::tuple<VkInstance, VkResult> create_vulkan_instance(const char* app_name, uint32_t app_version, uint32_t vk_api_version) {
+    VkApplicationInfo app_info{
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pNext = nullptr,
+        .pApplicationName = app_name,
+        .applicationVersion = app_version,
+        .pEngineName = "No Engine",
+        .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
+        .apiVersion = vk_api_version
+    };
+
+    VkInstanceCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .pApplicationInfo = &app_info,
+        .enabledLayerCount = 0,
+        .ppEnabledLayerNames = nullptr,
+        .enabledExtensionCount = 0,
+        .ppEnabledExtensionNames = nullptr
+    };
+
+    VkInstance instance;
+    VkResult result = vkCreateInstance(&create_info, nullptr, &instance);
+    return std::make_tuple(instance, result);
+}
+
+VkPhysicalDevice pick_physical_device(VkInstance instance, uint32_t score_gpu(VkPhysicalDevice gpu)) {
+    uint32_t gpu_count = 0;
+    vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr); // query number of gpus without allocating
+    std::vector<VkPhysicalDevice> gpus(gpu_count);
+    vkEnumeratePhysicalDevices(instance, &gpu_count, gpus.data());
+
+    VkPhysicalDevice best_gpu = VK_NULL_HANDLE;
+    uint32_t best_score = 0; // not suitable
+    for (VkPhysicalDevice gpu : gpus) {
+        uint32_t score = score_gpu(gpu);
+        if (score > best_score) {
+            best_gpu = gpu;
+            best_score = score;
+        }
+    }
+
+    return best_gpu;
+}
+
+std::tuple<VkDevice, VkResult> create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices) {
+    std::vector<VkDeviceQueueCreateInfo> queue_create_infos = queue_family_indices.make_queue_create_infos();
+
+    VkPhysicalDeviceBufferDeviceAddressFeatures enabled_bda_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+        .pNext = nullptr,
+        .bufferDeviceAddress = VK_TRUE
+    };
+
+    VkPhysicalDeviceFeatures2 enabled_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &enabled_bda_features,
+        .features = {
+            .shaderInt64 = VK_TRUE
+        }
+    };
+
+    VkDeviceCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &enabled_features,
+        .flags = 0,
+        .queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size()),
+        .pQueueCreateInfos = queue_create_infos.data(),
+        //enabledLayerCount (legacy)
+        //ppEnabledLayerNames (legacy)
+        .enabledExtensionCount = 0,
+        .ppEnabledExtensionNames = nullptr,
+        //pEnabledFeatures (legacy)
+    };
+
+    VkDevice device;
+    VkResult result = vkCreateDevice(gpu, &create_info, nullptr, &device);
+    return std::make_tuple(device, result);
+}
+
+std::tuple<VkShaderModule, VkResult> create_shader_module_from_file(VkDevice device, const char* path) {
+    std::ifstream file(path, std::ios::ate | std::ios::binary);
+    if (!file.is_open()) {
+        std::cout << "failed to open shader binary " << path << std::endl;
+        return std::make_tuple(VK_NULL_HANDLE, VK_ERROR_UNKNOWN);
+    }
+
+    std::vector<char> code(file.tellg()); // opened with read pointer at end so tellg() gives the file size in bytes
+    file.seekg(0); // return read pointer to start of file
+    file.read(code.data(), code.size()); // read entire file
+
+    VkShaderModuleCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .codeSize = code.size(),
+        .pCode = reinterpret_cast<uint32_t*>(code.data())
+    };
+
+    VkShaderModule shader_module;
+    VkResult result = vkCreateShaderModule(device, &create_info, nullptr, &shader_module);
+    return std::make_tuple(shader_module, result);
+}
+
+std::tuple<VkBuffer, VkResult> create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, const std::vector<uint32_t>& owning_queue_indices) {
+    VkBufferCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .size = size,
+        .usage = usage,
+        .sharingMode = owning_queue_indices.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = static_cast<uint32_t>(owning_queue_indices.size()),
+        .pQueueFamilyIndices = owning_queue_indices.data()
+    };
+
+    VkBuffer buffer;
+    VkResult result = vkCreateBuffer(device, &create_info, nullptr, &buffer);
+    return std::make_tuple(buffer, result);
+}
+
+/*#include <iostream>
+#include <fstream>
 #include <vector>
 #include <tuple>
 #include <string>
@@ -30,12 +326,12 @@ struct PushConstants {
     uint32_t opcode;
 };
 
-bool create_vulkan_instance(VkInstance& instance, const char* app_name);
-std::tuple<VkPhysicalDevice, QueueFamilyIndices> pick_physical_device(VkInstance instance);
-QueueFamilyIndices find_queue_family_indices(VkPhysicalDevice gpu);
-bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
-bool create_vma_allocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VmaAllocator& allocator);
-bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
+//bool create_vulkan_instance(VkInstance& instance, const char* app_name);
+//std::tuple<VkPhysicalDevice, QueueFamilyIndices> pick_physical_device(VkInstance instance);
+//QueueFamilyIndices find_queue_family_indices(VkPhysicalDevice gpu);
+//bool create_logical_device(VkPhysicalDevice gpu, const QueueFamilyIndices& queue_family_indices, VkDevice& device);
+//bool create_vma_allocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device, VmaAllocator& allocator);
+//bool load_shader_spv(VkDevice device, VkShaderModule& shader_module, const char* path);
 bool create_buffer(VmaAllocator allocator, size_t size, VkBuffer& buffer, VmaAllocation& allocation);
 bool create_pipeline_layout(VkDevice device, VkPipelineLayout& pipeline_layout);
 bool create_compute_pipeline(VkDevice device, VkPipelineLayout pipeline_layout, VkShaderModule shader_module, VkPipeline& pipeline);
@@ -151,7 +447,7 @@ int main(int argc, char* argv[]) {
         }*/
         ///
 
-        vmaUnmapMemory(allocator, allocation);
+/*        vmaUnmapMemory(allocator, allocation);
     }
 
     VkPipelineLayout pipeline_layout;
@@ -472,3 +768,4 @@ bool create_fence(VkDevice device, bool create_signalled, VkFence& fence) {
     if (create_signalled) create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     return vkCreateFence(device, &create_info, NULL, &fence) == VK_SUCCESS;
 }
+*/
