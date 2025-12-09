@@ -106,24 +106,11 @@ std::tuple<VkShaderModule, VkResult> create_shader_module_from_file(VkDevice dev
     return std::make_tuple(shader_module, result);
 }
 
-std::tuple<VkBuffer, VkResult> create_buffer(
-    VkDevice device,
-    VkDeviceSize size,
-    VkBufferUsageFlags usage,
-    const std::vector<uint32_t>& owning_queue_indices
-) {
-    VkBufferCreateInfo create_info{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+VkDeviceAddress get_buffer_device_address(VkDevice device, VkBuffer buffer) {
+    VkBufferDeviceAddressInfo bda_info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
         .pNext = nullptr,
-        .flags = 0,
-        .size = size,
-        .usage = usage,
-        .sharingMode = owning_queue_indices.size() > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = static_cast<uint32_t>(owning_queue_indices.size()),
-        .pQueueFamilyIndices = owning_queue_indices.data()
+        .buffer = buffer
     };
-
-    VkBuffer buffer;
-    VkResult result = vkCreateBuffer(device, &create_info, nullptr, &buffer);
-    return std::make_tuple(buffer, result);
+    return vkGetBufferDeviceAddress(device, &bda_info);
 }

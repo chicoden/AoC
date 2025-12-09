@@ -30,9 +30,4 @@ std::tuple<VkDevice, VkResult> create_logical_device(
     const std::vector<const char*>& enabled_extensions
 );
 std::tuple<VkShaderModule, VkResult> create_shader_module_from_file(VkDevice device, const char* path);
-std::tuple<VkBuffer, VkResult> create_buffer(
-    VkDevice device,
-    VkDeviceSize size,
-    VkBufferUsageFlags usage,
-    const std::vector<uint32_t>& owning_queue_indices
-);
+VkDeviceAddress get_buffer_device_address(VkDevice device, VkBuffer buffer);
