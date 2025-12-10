@@ -52,11 +52,19 @@ void record_solve_math_problems_routine(
     VkCommandBuffer command_buffer,
     VkPipelineLayout pipeline_layout,
     VkDeviceAddress buffer_address,
-    uint32_t problem_stride,
-    uint32_t problem_count,
-    uint32_t problems_offset,
-    uint32_t results_offset,
+    size_t problem_stride,
+    size_t problem_count,
+    size_t problems_offset,
+    size_t results_offset,
     Opcode opcode
+);
+size_t record_sum_results_routine(
+    VkCommandBuffer command_buffer,
+    VkPipelineLayout pipeline_layout,
+    VkDeviceAddress buffer_address,
+    size_t result_count,
+    size_t results_offset,
+    size_t scratch_offset
 );
 
 int main(int argc, char* argv[]) {
@@ -187,7 +195,9 @@ int main(int argc, char* argv[]) {
     size_t mul_problems_offset = struct_builder.add<uint32_t>(mul_problem_count * values_per_problem);
     size_t add_results_offset = struct_builder.add<uint64_t>(add_problem_count);
     size_t mul_results_offset = struct_builder.add<uint64_t>(mul_problem_count);
+    size_t scratch_offset = struct_builder.add<uint64_t>(total_problem_count);
     size_t total_data_size = struct_builder.total_size();
+    const size_t& results_offset = add_results_offset;
 
     VkBuffer buffer;
     VmaAllocation buffer_allocation;
@@ -242,28 +252,47 @@ int main(int argc, char* argv[]) {
             command_buffer,
             pipeline_layout,
             buffer_address,
-            static_cast<uint32_t>(problem_stride),
-            static_cast<uint32_t>(add_problem_count),
-            static_cast<uint32_t>(add_problems_offset),
-            static_cast<uint32_t>(add_results_offset),
+            problem_stride,
+            add_problem_count,
+            add_problems_offset,
+            add_results_offset,
             Opcode::ADD
         );
         record_solve_math_problems_routine(
             command_buffer,
             pipeline_layout,
             buffer_address,
-            static_cast<uint32_t>(problem_stride),
-            static_cast<uint32_t>(mul_problem_count),
-            static_cast<uint32_t>(mul_problems_offset),
-            static_cast<uint32_t>(mul_results_offset),
+            problem_stride,
+            mul_problem_count,
+            mul_problems_offset,
+            mul_results_offset,
             Opcode::MUL
+        );
+
+        size_t final_result_offset = record_sum_results_routine(
+            command_buffer,
+            pipeline_layout,
+            buffer_address,
+            total_problem_count,
+            results_offset,
+            scratch_offset
         );
     VK_CHECK(vkEndCommandBuffer(command_buffer));
 
     VK_CHECK(submit_command_buffer(queues.compute, command_buffer, {}, {}, {}, work_done_fence));
     VK_CHECK(vkWaitForFences(device, 1, &work_done_fence, VK_TRUE, UINT64_MAX));
 
-    std::cout << "done? " << total_problem_count << std::endl;///
+    {
+        void* mapped_buffer;
+        VK_CHECK(vmaMapMemory(allocator, buffer_allocation, &mapped_buffer));
+        DEFER(unmap_buffer, vmaUnmapMemory(allocator, buffer_allocation));
+
+        //uint64_t final_result = *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + final_result_offset);
+        //std::cout << "Result: " << final_result << std::endl;
+        std::cout << results_offset << ", " << scratch_offset << ", " << final_result_offset << std::endl;///
+        uint64_t* values = reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + final_result_offset);
+        for (int i = 0; i < 16; i++) std::cout << "Value: " << values[i] << std::endl;
+    }
 
     return 0;
 }
@@ -346,56 +375,50 @@ void record_solve_math_problems_routine(
     VkCommandBuffer command_buffer,
     VkPipelineLayout pipeline_layout,
     VkDeviceAddress buffer_address,
-    uint32_t problem_stride,
-    uint32_t problem_count,
-    uint32_t problems_offset,
-    uint32_t results_offset,
+    size_t problem_stride,
+    size_t problem_count,
+    size_t problems_offset,
+    size_t results_offset,
     Opcode opcode
 ) {
     PushConstants push_constants{
         .data_in_ptr = buffer_address + problems_offset,
         .data_out_ptr = buffer_address + results_offset,
-        .problem_count = problem_count,
-        .problem_stride = problem_stride,
+        .problem_count = static_cast<uint32_t>(problem_count),
+        .problem_stride = static_cast<uint32_t>(problem_stride),
         .opcode = opcode
     };
+
+    uint32_t workgroup_count = (push_constants.problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
     vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push_constants), &push_constants);
-
-    uint32_t workgroup_count_x = (problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
-    vkCmdDispatch(command_buffer, workgroup_count_x, 1, 1);
+    vkCmdDispatch(command_buffer, workgroup_count, 1, 1);
 }
 
-/*
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer;
+size_t record_sum_results_routine(
+    VkCommandBuffer command_buffer,
+    VkPipelineLayout pipeline_layout,
+    VkDeviceAddress buffer_address,
+    size_t result_count,
+    size_t results_offset,
+    size_t scratch_offset
+) {
+    PushConstants push_constants{
+        .data_in_ptr = buffer_address + results_offset,
+        .data_out_ptr = buffer_address + scratch_offset,
+        .problem_count = static_cast<uint32_t>(result_count),
+        .opcode = Opcode::COMBINE_RESULTS
+    };
 
-    if (vkQueueSubmit(compute_queue, 1, &submit_info, work_complete_fence) != VK_SUCCESS) {
-        std::cout << "failed to submit command buffer" << std::endl;
-        return 0;
+    while (push_constants.problem_count > 1) {
+        ///vkCmdPipelineBarrier();
+
+        uint32_t workgroup_count = (push_constants.problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+        vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push_constants), &push_constants);
+        vkCmdDispatch(command_buffer, workgroup_count, 1, 1);
+
+        std::swap(push_constants.data_in_ptr, push_constants.data_out_ptr); // ping pong
+        push_constants.problem_count = workgroup_count; // each workgroup reduces a block of results to a single result
     }
 
-    if (vkWaitForFences(device, 1, &work_complete_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
-        std::cout << "failed to wait on fence" << std::endl;
-        return 0;
-    }
-
-    uint64_t result;
-    {
-        void* data;
-        if (vmaMapMemory(allocator, allocation, &data) != VK_SUCCESS) {
-            std::cout << "failed to map buffer" << std::endl;
-            return 0;
-        }
-
-        // read final result out from mapped buffer
-        result = *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(data) + final_result_offset);
-
-        vmaUnmapMemory(allocator, allocation);
-    }
-
-    std::cout << "Result: " << result << std::endl;
-    return 0;
+    return push_constants.data_in_ptr - buffer_address; // return offset to final result
 }
-*/
