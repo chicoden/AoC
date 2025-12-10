@@ -1,0 +1,22 @@
+ptr input_start
+read_pos = input_start
+u64 stride_next_row
+
+ptr start_tachyon
+do
+    ch = *read_pos
+    if ch == 'S'
+        start_tachyon = read_pos
+
+    read_pos++
+while ch != '\n'
+stride_next_row = read_pos - input_start
+stride_next_row_left = stride_next_row - 1
+stride_next_row_right = stride_next_row + 1
+
+*(start_tachyon + line_stride) = '|'
+loop
+    if *(read_pos + stride_next_row) == 0
+        break
+
+    //

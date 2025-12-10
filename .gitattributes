@@ -1,1 +1,2 @@
+*.glsl.* linguist-language=GLSL
 2025/day6/cephalopod_math/include/vk_mem_alloc.h linguist-vendored
