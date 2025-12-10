@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 4.1)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+set(ERRORS_AS_WARNINGS OFF CACHE BOOL "Enable errors as warnings for debugging, cannot always be enabled because VMA fucks things up")
+
+if(${ERRORS_AS_WARNINGS})
+    add_compile_options(/W4 /WX)
+endif()
 
 project(CephalopodMath)
     find_package(Vulkan 1.3 REQUIRED)
@@ -28,6 +32,6 @@ project(CephalopodMath)
 
     include_directories(${Vulkan_INCLUDE_DIRS} ../include)
     file(GLOB sources "*.cpp")
-    add_executable(CephalopodMath ${sources})
-    add_dependencies(CephalopodMath compile_shaders)
-    target_link_libraries(CephalopodMath ${Vulkan_LIBRARIES})
+    add_executable(${CMAKE_PROJECT_NAME} ${sources})
+    add_dependencies(${CMAKE_PROJECT_NAME} compile_shaders)
+    target_link_libraries(${CMAKE_PROJECT_NAME} ${Vulkan_LIBRARIES})

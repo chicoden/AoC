@@ -242,20 +242,20 @@ int main(int argc, char* argv[]) {
             command_buffer,
             pipeline_layout,
             buffer_address,
-            problem_stride,
-            add_problem_count,
-            add_problems_offset,
-            add_results_offset,
+            static_cast<uint32_t>(problem_stride),
+            static_cast<uint32_t>(add_problem_count),
+            static_cast<uint32_t>(add_problems_offset),
+            static_cast<uint32_t>(add_results_offset),
             Opcode::ADD
         );
         record_solve_math_problems_routine(
             command_buffer,
             pipeline_layout,
             buffer_address,
-            problem_stride,
-            mul_problem_count,
-            mul_problems_offset,
-            mul_results_offset,
+            static_cast<uint32_t>(problem_stride),
+            static_cast<uint32_t>(mul_problem_count),
+            static_cast<uint32_t>(mul_problems_offset),
+            static_cast<uint32_t>(mul_results_offset),
             Opcode::MUL
         );
     VK_CHECK(vkEndCommandBuffer(command_buffer));
@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
     VK_CHECK(submit_command_buffer(queues.compute, command_buffer, {}, {}, {}, work_done_fence));
     VK_CHECK(vkWaitForFences(device, 1, &work_done_fence, VK_TRUE, UINT64_MAX));
 
-    std::cout << "done?" << std::endl;///
+    std::cout << "done? " << total_problem_count << std::endl;///
 
     return 0;
 }
