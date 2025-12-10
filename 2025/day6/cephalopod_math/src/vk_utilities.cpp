@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdint>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "vk_utilities.hpp"
@@ -211,18 +212,25 @@ VkResult begin_command_buffer(
     return vkBeginCommandBuffer(command_buffer, &begin_info);
 }
 
-/*VkResult submit_command_buffer(VkQueue queue, VkFence fence) {
+VkResult submit_command_buffer(
+    VkQueue queue,
+    VkCommandBuffer command_buffer,
+    const std::vector<VkSemaphore>& wait_semaphores,
+    const std::vector<VkPipelineStageFlags>& wait_dst_stage_masks,
+    const std::vector<VkSemaphore>& signal_semaphores,
+    VkFence fence
+) {
     VkSubmitInfo submit_info{
-        .sType;
-        .pNext;
-        .waitSemaphoreCount;
-        .pWaitSemaphores;
-        .pWaitDstStageMask;
-        .commandBufferCount;
-        .pCommandBuffers;
-        .signalSemaphoreCount;
-        .pSignalSemaphores;
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size()),
+        .pWaitSemaphores = wait_semaphores.data(),
+        .pWaitDstStageMask = wait_dst_stage_masks.data(),
+        .commandBufferCount = 1,
+        .pCommandBuffers = &command_buffer,
+        .signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+        .pSignalSemaphores = signal_semaphores.data()
     };
 
     return vkQueueSubmit(queue, 1, &submit_info, fence);
-}*/
+}

@@ -59,3 +59,11 @@ VkResult begin_command_buffer(
     VkCommandBufferUsageFlags usage_flags,
     const VkCommandBufferInheritanceInfo* inheritance_info
 );
+VkResult submit_command_buffer(
+    VkQueue queue,
+    VkCommandBuffer command_buffer,
+    const std::vector<VkSemaphore>& wait_semaphores,
+    const std::vector<VkPipelineStageFlags>& wait_dst_stage_masks,
+    const std::vector<VkSemaphore>& signal_semaphores,
+    VkFence fence
+);

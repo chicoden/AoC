@@ -17,6 +17,14 @@
 #define VMA_VULKAN_VERSION 1003000 // Vulkan 1.3
 #include "vk_mem_alloc.h"
 
+const uint32_t WORKGROUP_SIZE = 256;
+
+enum Opcode : uint32_t {
+    ADD = 0,
+    MUL = 1,
+    COMBINE_RESULTS = 2
+};
+
 struct PushConstants {
     uint64_t data_in_ptr;
     uint64_t data_out_ptr;
@@ -40,11 +48,16 @@ struct QueueFamilyIndices {
 };
 
 uint32_t calculate_gpu_score(VkPhysicalDevice gpu);
-
-const uint32_t WORKGROUP_SIZE = 256;
-const uint32_t OP_ADD = 0;
-const uint32_t OP_MUL = 1;
-const uint32_t OP_COMBINE_RESULTS = 2;
+void record_solve_math_problems_routine(
+    VkCommandBuffer command_buffer,
+    VkPipelineLayout pipeline_layout,
+    VkDeviceAddress buffer_address,
+    uint32_t problem_stride,
+    uint32_t problem_count,
+    uint32_t problems_offset,
+    uint32_t results_offset,
+    Opcode opcode
+);
 
 int main(int argc, char* argv[]) {
     if (argc != 2) { // first argument is implicit (the path of the executable)
@@ -167,6 +180,7 @@ int main(int argc, char* argv[]) {
 
     size_t total_problem_count = ops.size();
     size_t values_per_problem = lines.size();
+    size_t problem_stride = values_per_problem * sizeof(uint32_t);
 
     StructBuilder struct_builder;
     size_t add_problems_offset = struct_builder.add<uint32_t>(add_problem_count * values_per_problem);
@@ -199,7 +213,6 @@ int main(int argc, char* argv[]) {
 
         uint32_t* add_problems = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + add_problems_offset);
         uint32_t* mul_problems = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + mul_problems_offset);
-        size_t read_pointer = 0;
         for (char op : ops) {
             uint32_t* problem;
             switch (op) {
@@ -223,8 +236,34 @@ int main(int argc, char* argv[]) {
     }
 
     VK_CHECK(begin_command_buffer(command_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, nullptr));
-        std::cout << "record commands" << std::endl;///
+        vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+
+        record_solve_math_problems_routine(
+            command_buffer,
+            pipeline_layout,
+            buffer_address,
+            problem_stride,
+            add_problem_count,
+            add_problems_offset,
+            add_results_offset,
+            Opcode::ADD
+        );
+        record_solve_math_problems_routine(
+            command_buffer,
+            pipeline_layout,
+            buffer_address,
+            problem_stride,
+            mul_problem_count,
+            mul_problems_offset,
+            mul_results_offset,
+            Opcode::MUL
+        );
     VK_CHECK(vkEndCommandBuffer(command_buffer));
+
+    VK_CHECK(submit_command_buffer(queues.compute, command_buffer, {}, {}, {}, work_done_fence));
+    VK_CHECK(vkWaitForFences(device, 1, &work_done_fence, VK_TRUE, UINT64_MAX));
+
+    std::cout << "done?" << std::endl;///
 
     return 0;
 }
@@ -303,18 +342,30 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
     return queues;
 }
 
+void record_solve_math_problems_routine(
+    VkCommandBuffer command_buffer,
+    VkPipelineLayout pipeline_layout,
+    VkDeviceAddress buffer_address,
+    uint32_t problem_stride,
+    uint32_t problem_count,
+    uint32_t problems_offset,
+    uint32_t results_offset,
+    Opcode opcode
+) {
+    PushConstants push_constants{
+        .data_in_ptr = buffer_address + problems_offset,
+        .data_out_ptr = buffer_address + results_offset,
+        .problem_count = problem_count,
+        .problem_stride = problem_stride,
+        .opcode = opcode
+    };
+    vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push_constants), &push_constants);
+
+    uint32_t workgroup_count_x = (problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+    vkCmdDispatch(command_buffer, workgroup_count_x, 1, 1);
+}
+
 /*
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    PushConstants push_constants;
-    push_constants.problem_stride = values_per_problem * sizeof(uint32_t);
-
-    push_constants.problems = buffer_address + add_problems_offset;
-    push_constants.results = buffer_address + add_results_offset;
-    push_constants.problem_count = add_problem_count;
-    push_constants.opcode = OP_ADD;
-    vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants), &push_constants);
-    vkCmdDispatch(command_buffer, (add_problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1, 1);
-
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;

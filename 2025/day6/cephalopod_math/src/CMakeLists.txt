@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 4.1)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
 project(CephalopodMath)
     find_package(Vulkan 1.3 REQUIRED)
