@@ -222,3 +222,19 @@ VkResult begin_command_buffer(
 
     return vkBeginCommandBuffer(command_buffer, &begin_info);
 }
+
+VkResult submit_command_buffer(VkQueue queue, VkFence fence) {
+    VkSubmitInfo submit_info{
+        .sType;
+        .pNext;
+        .waitSemaphoreCount;
+        .pWaitSemaphores;
+        .pWaitDstStageMask;
+        .commandBufferCount;
+        .pCommandBuffers;
+        .signalSemaphoreCount;
+        .pSignalSemaphores;
+    };
+
+    return vkQueueSubmit(queue, 1, &submit_info, fence);
+}

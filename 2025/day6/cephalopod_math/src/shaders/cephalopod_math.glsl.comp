@@ -2,16 +2,17 @@
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 #extension GL_EXT_buffer_reference : require
 
-layout(local_size_x = 32) in;
+const uint32_t WORKGROUP_SIZE = 256;
+layout(local_size_x = WORKGROUP_SIZE) in;
 
 layout(buffer_reference, buffer_reference_align = 4) buffer PtrU32 { uint32_t deref; };
 layout(buffer_reference, buffer_reference_align = 8) buffer PtrU64 { uint64_t deref; };
 
 layout(std430, push_constant) uniform PushConstants {
-    PtrU32 problems;
-    PtrU64 results;
-    uint32_t problem_stride;
+    uint64_t data_in_ptr;
+    uint64_t data_out_ptr;
     uint32_t problem_count;
+    uint32_t problem_stride;
     uint32_t opcode;
 };
 
@@ -22,10 +23,10 @@ const uint32_t OP_ADD = 0;
 const uint32_t OP_MUL = 1;
 const uint32_t OP_COMBINE_RESULTS = 2;
 
-void solve_math_problem(uint32_t problem_id) {
-    if (problem_id >= problem_count) return;
+shared uint64_t scratch[WORKGROUP_SIZE];
 
-    uint64_t start_ptr = uint64_t(problems) + problem_id * problem_stride;
+void solve_math_problem(uint32_t problem_id) {
+    uint64_t start_ptr = data_in_ptr + problem_id * problem_stride;
     uint64_t end_ptr = start_ptr + problem_stride;
 
     uint64_t result;
@@ -45,14 +46,36 @@ void solve_math_problem(uint32_t problem_id) {
         }
     }
 
-    uint64_t result_ptr = uint64_t(results) + problem_id * SIZEOF_U64;
+    uint64_t result_ptr = data_out_ptr + problem_id * SIZEOF_U64;
     PtrU64(result_ptr).deref = result;
+}
+
+void reduction_add_results(uint32_t global_index, uint32_t workgroup_index, uint32_t local_index) {
+    scratch[local_index] = global_index < problem_count
+        ? PtrU64(data_in_ptr + global_index * SIZEOF_U64).deref
+        : 0;
+
+    barrier();
+    for (uint32_t n = WORKGROUP_SIZE >> 1; n > 0; n >>= 1) {
+        if (local_index < n) scratch[local_index] += scratch[local_index + n];
+        barrier();
+    }
+
+    if (local_index == 0) {
+        PtrU64(data_out_ptr + workgroup_index * SIZEOF_U64).deref = scratch[0];
+    }
 }
 
 void main() {
     if (opcode != OP_COMBINE_RESULTS) {
-        solve_math_problem(gl_GlobalInvocationID.x);
+        if (gl_GlobalInvocationID.x < problem_count) {
+            solve_math_problem(gl_GlobalInvocationID.x);
+        }
     } else {
-        // reduce results
+        reduction_add_results(
+            gl_GlobalInvocationID.x,
+            gl_WorkGroupID.x,
+            gl_LocalInvocationID.x
+        );
     }
 }

@@ -302,13 +302,6 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
 }
 
 /*
-    VkCommandBufferBeginInfo begin_info{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
-        std::cout << "failed to begin command buffer" << std::endl;
-        return 0;
-    }
-
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
     PushConstants push_constants;
     push_constants.problem_stride = values_per_problem * sizeof(uint32_t);
@@ -319,11 +312,6 @@ Queues QueueFamilyIndices::get_queues(VkDevice device) const {
     push_constants.opcode = OP_ADD;
     vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants), &push_constants);
     vkCmdDispatch(command_buffer, (add_problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1, 1);
-
-    if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
-        std::cout << "failed to end command buffer" << std::endl;
-        return 0;
-    }
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
