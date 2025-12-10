@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <cstdint>
-#include <utility>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "vk_utilities.hpp"

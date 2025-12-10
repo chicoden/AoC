@@ -402,6 +402,13 @@ size_t record_sum_results_routine(
     size_t results_offset,
     size_t scratch_offset
 ) {
+    VkMemoryBarrier memory_barrier{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT
+    };
+
     PushConstants push_constants{
         .data_in_ptr = buffer_address + results_offset,
         .data_out_ptr = buffer_address + scratch_offset,
@@ -410,7 +417,16 @@ size_t record_sum_results_routine(
     };
 
     while (push_constants.problem_count > 1) {
-        ///vkCmdPipelineBarrier();
+        // first, wait for changes to memory made by the previous dispatch to be visible
+        vkCmdPipelineBarrier(
+            command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            (VkDependencyFlags)0,
+            1, &memory_barrier,
+            0, nullptr,
+            0, nullptr
+        );
 
         uint32_t workgroup_count = (push_constants.problem_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
         vkCmdPushConstants(command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push_constants), &push_constants);
