@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36301.6 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cephalopod_math2", "cephalopod_math2\cephalopod_math2.csproj", "{54796CC1-0977-498B-82C0-2CEA1A97DD1D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{54796CC1-0977-498B-82C0-2CEA1A97DD1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{54796CC1-0977-498B-82C0-2CEA1A97DD1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{54796CC1-0977-498B-82C0-2CEA1A97DD1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{54796CC1-0977-498B-82C0-2CEA1A97DD1D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1229FF4F-6037-4036-888A-A9814F01B02B}
+	EndGlobalSection
+EndGlobal
