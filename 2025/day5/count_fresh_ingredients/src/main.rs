@@ -25,15 +25,11 @@ fn main() {
                 .map_while(parse_id_range)
         );
 
-        let mut fresh_available_ingredient_count: u32 = 0;
-        for id in lines.by_ref()
+        let fresh_available_ingredient_count = lines.by_ref()
             .map_while(Result::ok)
             .map_while(parse_id)
-        {
-            if fresh_ids.contains(id) {
-                fresh_available_ingredient_count += 1;
-            }
-        }
+            .filter(|id| fresh_ids.contains(*id))
+            .count();
 
         if !lines.is_exhausted() { // should have reached the end of the input file
             println!("failed to parse input");
