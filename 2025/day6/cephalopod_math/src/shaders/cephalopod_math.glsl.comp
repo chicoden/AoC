@@ -25,8 +25,8 @@ const uint32_t OP_COMBINE_RESULTS = 2;
 
 shared uint64_t scratch[WORKGROUP_SIZE];
 
-void solve_math_problem(uint32_t problem_id) {
-    uint64_t start_ptr = data_in_ptr + problem_id * problem_stride;
+void solve_math_problem(uint32_t problem_index) {
+    uint64_t start_ptr = data_in_ptr + problem_index * problem_stride;
     uint64_t end_ptr = start_ptr + problem_stride;
 
     uint64_t result;
@@ -46,7 +46,7 @@ void solve_math_problem(uint32_t problem_id) {
         }
     }
 
-    uint64_t result_ptr = data_out_ptr + problem_id * SIZEOF_U64;
+    uint64_t result_ptr = data_out_ptr + problem_index * SIZEOF_U64;
     PtrU64(result_ptr).deref = result;
 }
 

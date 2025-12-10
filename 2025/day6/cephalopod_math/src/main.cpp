@@ -280,24 +280,26 @@ int main(int argc, char* argv[]) {
     VK_CHECK(vkEndCommandBuffer(command_buffer));
 
     VK_CHECK(submit_command_buffer(queues.compute, command_buffer, {}, {}, {}, work_done_fence));
-    VK_CHECK(vkWaitForFences(device, 1, &work_done_fence, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkWaitForFences(device, 1, &work_done_fence, VK_TRUE, UINT64_MAX)); // wait for command buffer to finish and signal our fence
 
     {
         void* mapped_buffer;
         VK_CHECK(vmaMapMemory(allocator, buffer_allocation, &mapped_buffer));
         DEFER(unmap_buffer, vmaUnmapMemory(allocator, buffer_allocation));
 
-        //uint64_t final_result = *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + final_result_offset);
-        //std::cout << "Result: " << final_result << std::endl;
-        std::cout << results_offset << ", " << scratch_offset << ", " << final_result_offset << std::endl;///
-        uint64_t* values = reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + final_result_offset);
-        for (int i = 0; i < 16; i++) std::cout << "Value: " << values[i] << std::endl;
+        uint64_t final_result = *reinterpret_cast<uint64_t*>(reinterpret_cast<uintptr_t>(mapped_buffer) + final_result_offset);
+        std::cout << "Result: " << final_result << std::endl;
     }
 
     return 0;
 }
 
 uint32_t calculate_gpu_score(VkPhysicalDevice gpu) {
+    VkPhysicalDeviceProperties2 properties;
+    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    properties.pNext = nullptr;
+    vkGetPhysicalDeviceProperties2(gpu, &properties);
+
     VkPhysicalDeviceFeatures2 features;
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     VkPhysicalDeviceBufferDeviceAddressFeatures bda_features;
@@ -308,16 +310,13 @@ uint32_t calculate_gpu_score(VkPhysicalDevice gpu) {
     vkGetPhysicalDeviceFeatures2(gpu, &features);
 
     if (
+        properties.properties.limits.maxComputeWorkGroupSize[0] < WORKGROUP_SIZE ||
+        properties.properties.limits.maxComputeSharedMemorySize < WORKGROUP_SIZE * sizeof(uint64_t) ||
         features.features.shaderInt64 == VK_FALSE ||
         bda_features.bufferDeviceAddress == VK_FALSE
     ) { // required features
         return 0;
     }
-
-    VkPhysicalDeviceProperties2 properties;
-    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    properties.pNext = nullptr;
-    vkGetPhysicalDeviceProperties2(gpu, &properties);
 
     switch (properties.properties.deviceType) {
         case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return 1000; // prefer discrete gpu
