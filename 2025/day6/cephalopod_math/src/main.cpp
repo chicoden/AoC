@@ -52,13 +52,14 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    auto [instance, instance_status] = create_vulkan_instance(
+    VkInstance instance;
+    VK_CHECK(create_vulkan_instance(
         "AoC 2025 - Day 6 Part 1",
         VK_MAKE_API_VERSION(0, 1, 0, 0),
         VK_API_VERSION_1_3,
-        {}, {}
-    );
-    VK_CHECK(instance_status);
+        {}, {},
+        instance
+    ));
     DEFER(cleanup_instance, vkDestroyInstance(instance, nullptr));
 
     VkPhysicalDevice gpu = pick_physical_device(instance, calculate_gpu_score);
@@ -87,12 +88,13 @@ int main(int argc, char* argv[]) {
         }
     };
 
-    auto [device, device_status] = create_logical_device(
+    VkDevice device;
+    VK_CHECK(create_logical_device(
         gpu,
         queue_family_indices.make_queue_create_infos(),
-        enabled_features, {}
-    );
-    VK_CHECK(device_status);
+        enabled_features, {},
+        device
+    ));
     DEFER(cleanup_device, vkDestroyDevice(device, nullptr));
     Queues queues = queue_family_indices.get_queues(device);
 
@@ -106,8 +108,8 @@ int main(int argc, char* argv[]) {
         VK_CHECK(vmaCreateAllocator(&create_info, &allocator));
     } DEFER(cleanup_allocator, vmaDestroyAllocator(allocator));
 
-    auto [math_shader, math_shader_status] = create_shader_module_from_file(device, "shaders/cephalopod_math.spv");
-    VK_CHECK(math_shader_status);
+    VkShaderModule math_shader;
+    VK_CHECK(create_shader_module_from_file(device, "shaders/cephalopod_math.spv", math_shader));
     DEFER(cleanup_math_shader, vkDestroyShaderModule(device, math_shader, nullptr));
 
     VkPushConstantRange push_constant_range{
@@ -115,24 +117,24 @@ int main(int argc, char* argv[]) {
         .offset = 0,
         .size = sizeof(PushConstants)
     };
-    auto [pipeline_layout, pipeline_layout_status] = create_pipeline_layout(device, {}, {push_constant_range});
-    VK_CHECK(pipeline_layout_status);
+    VkPipelineLayout pipeline_layout;
+    VK_CHECK(create_pipeline_layout(device, {}, {push_constant_range}, pipeline_layout));
     DEFER(cleanup_pipeline_layout, vkDestroyPipelineLayout(device, pipeline_layout, nullptr));
 
-    auto [pipeline, pipeline_status] = create_compute_pipeline(device, pipeline_layout, math_shader, "main", nullptr);
-    VK_CHECK(pipeline_status);
+    VkPipeline pipeline;
+    VK_CHECK(create_compute_pipeline(device, pipeline_layout, math_shader, "main", nullptr, pipeline));
     DEFER(cleanup_pipeline, vkDestroyPipeline(device, pipeline, nullptr));
 
-    auto [command_pool, command_pool_status] = create_command_pool(device, 0, queue_family_indices.compute.value());
-    VK_CHECK(command_pool_status);
+    VkCommandPool command_pool;
+    VK_CHECK(create_command_pool(device, 0, queue_family_indices.compute.value(), command_pool));
     DEFER(cleanup_command_pool, vkDestroyCommandPool(device, command_pool, nullptr)); // also frees any command buffers allocated from the pool
 
-    auto [command_buffer, command_buffer_status] = allocate_command_buffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-    VK_CHECK(command_buffer_status);
+    VkCommandBuffer command_buffer;
+    VK_CHECK(allocate_command_buffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, command_buffer));
     // automatically freed when parent command pool is destroyed
 
-    auto [work_done_fence, work_done_fence_status] = create_fence(device, false);
-    VK_CHECK(work_done_fence_status);
+    VkFence work_done_fence;
+    VK_CHECK(create_fence(device, false, work_done_fence));
     DEFER(cleanup_work_done_fence, vkDestroyFence(device, work_done_fence, nullptr));
 
     std::ifstream input_file(argv[1]);

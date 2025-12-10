@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <cstdint>
-#include <tuple>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <vulkan/vk_enum_string_helper.h>
@@ -15,41 +14,46 @@
     } \
 }
 
-std::tuple<VkInstance, VkResult> create_vulkan_instance(
+VkResult create_vulkan_instance(
     const char* app_name,
     uint32_t app_version,
     uint32_t vk_api_version,
     const std::vector<const char*>& enabled_layers,
-    const std::vector<const char*>& enabled_extensions
+    const std::vector<const char*>& enabled_extensions,
+    VkInstance& instance
 );
 VkPhysicalDevice pick_physical_device(VkInstance instance, uint32_t score_gpu(VkPhysicalDevice gpu));
-std::tuple<VkDevice, VkResult> create_logical_device(
+VkResult create_logical_device(
     VkPhysicalDevice gpu,
     const std::vector<VkDeviceQueueCreateInfo>& queue_create_infos,
     const VkPhysicalDeviceFeatures2& enabled_features,
-    const std::vector<const char*>& enabled_extensions
+    const std::vector<const char*>& enabled_extensions,
+    VkDevice& device
 );
-std::tuple<VkShaderModule, VkResult> create_shader_module_from_file(VkDevice device, const char* path);
+VkResult create_shader_module_from_file(VkDevice device, const char* path, VkShaderModule& shader_module);
 VkDeviceAddress get_buffer_device_address(VkDevice device, VkBuffer buffer);
-std::tuple<VkPipelineLayout, VkResult> create_pipeline_layout(
+VkResult create_pipeline_layout(
     VkDevice device,
     const std::vector<VkDescriptorSetLayout>& descriptor_set_layouts,
-    const std::vector<VkPushConstantRange>& push_constant_ranges
+    const std::vector<VkPushConstantRange>& push_constant_ranges,
+    VkPipelineLayout& pipeline_layout
 );
-std::tuple<VkPipeline, VkResult> create_compute_pipeline(
+VkResult create_compute_pipeline(
     VkDevice device,
     VkPipelineLayout pipeline_layout,
     VkShaderModule shader_module,
     const char* entrypoint,
-    const VkSpecializationInfo* specialization_info
+    const VkSpecializationInfo* specialization_info,
+    VkPipeline& pipeline
 );
-std::tuple<VkCommandPool, VkResult> create_command_pool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queue_family_index);
-std::tuple<VkCommandBuffer, VkResult> allocate_command_buffer(
+VkResult create_command_pool(VkDevice device, VkCommandPoolCreateFlags flags, uint32_t queue_family_index, VkCommandPool& command_pool);
+VkResult allocate_command_buffer(
     VkDevice device,
     VkCommandPool parent_command_pool,
-    VkCommandBufferLevel command_buffer_level
+    VkCommandBufferLevel command_buffer_level,
+    VkCommandBuffer& command_buffer
 );
-std::tuple<VkFence, VkResult> create_fence(VkDevice device, bool create_signalled);
+VkResult create_fence(VkDevice device, bool create_signalled, VkFence& fence);
 VkResult begin_command_buffer(
     VkCommandBuffer command_buffer,
     VkCommandBufferUsageFlags usage_flags,
