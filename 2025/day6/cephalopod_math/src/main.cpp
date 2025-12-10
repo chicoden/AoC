@@ -18,10 +18,10 @@
 #include "vk_mem_alloc.h"
 
 struct PushConstants {
-    VkDeviceAddress problems;
-    VkDeviceAddress results;
-    uint32_t problem_stride;
+    uint64_t data_in_ptr;
+    uint64_t data_out_ptr;
     uint32_t problem_count;
+    uint32_t problem_stride;
     uint32_t opcode;
 };
 
@@ -41,7 +41,7 @@ struct QueueFamilyIndices {
 
 uint32_t calculate_gpu_score(VkPhysicalDevice gpu);
 
-const uint32_t WORKGROUP_SIZE = 32;
+const uint32_t WORKGROUP_SIZE = 256;
 const uint32_t OP_ADD = 0;
 const uint32_t OP_MUL = 1;
 const uint32_t OP_COMBINE_RESULTS = 2;
