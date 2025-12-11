@@ -16,8 +16,7 @@ loop
     grid_width++
 // found grid width
 
-padding = alignof(u64) - (sizeof(input) % alignof(u64))
-tachyons_in = &input[sizeof(input)] + padding
+tachyons_in = round_up(&input[sizeof(input)], alignof(u64))
 tachyons_out = tachyons_in + grid_width * sizeof(u64)
 total_size = tachyons_out + grid_width * sizeof(u64)
 
