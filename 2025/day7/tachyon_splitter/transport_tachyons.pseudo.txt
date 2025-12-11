@@ -37,8 +37,8 @@ loop
     tachyon_index = 0
     tachyon_out_count = 0
     loop
-        if tachyon_index == grid_width
-            break
+        if tachyon_index == tachyons_in_count
+            break // processed all incoming tachyons
 
         //
 
@@ -46,3 +46,4 @@ loop
 
     swap(tachyons_in, tachyons_out)
     tachyons_in_count = tachyons_out_count
+    line_start = next_line_start
