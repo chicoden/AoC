@@ -10,7 +10,7 @@ loop
     if input[grid_width] == 'S'
         start_pos = grid_width
 
-    if input[grid_width] == '\n'
+    elif input[grid_width] == '\n'
         break
 
     grid_width++
@@ -39,6 +39,10 @@ loop
     loop
         if tachyon_index == tachyons_in_count
             break // processed all incoming tachyons
+
+        tachyon_pos = tachyons_in[tachyon_index]
+        if line_start[tachyon_pos] == '.'
+            line_start[tachyon_pos] = '|' // propagate into free space
 
         //
 
