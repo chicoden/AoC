@@ -1,9 +1,5 @@
 #pragma once
 
-size_t round_up(size_t offset, size_t align) {
-    return (offset + align - 1) / align * align;
-}
-
 class StructBuilder {
 private:
     size_t size;
@@ -11,6 +7,10 @@ private:
 public:
     StructBuilder() : size(0) {};
     ~StructBuilder() {};
+
+    static size_t round_up(size_t offset, size_t align) {
+        return (offset + align - 1) / align * align;
+    }
 
     template<typename T>
     size_t add(size_t count) {
