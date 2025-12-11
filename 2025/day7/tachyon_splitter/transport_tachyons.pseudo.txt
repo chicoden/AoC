@@ -1,39 +1,48 @@
 memory(
-    u8[] input, padding?
-    u64[] tachyon_positions_1,
-    u64[] tachyon_positions_2
+    u8[] input, padding?,
+    u64[] tachyons_in,
+    u64[] tachyons_out
 )
 
-seek_pos = input
-
-start_tachyon_pos = nullptr
+grid_width = 0
+start_pos = 0
 loop
-    ch = *seek_pos
-    if ch == 'S'
-        start_tachyon_pos = seek_pos
+    if input[grid_width] == 'S'
+        start_pos = grid_width
 
-    seek_pos++
-    if ch == '\n'
-        break
-// seek_pos points to start of next line now
-
-stride_next_row = seek_pos - &input[0]
-stride_next_row_left = stride_next_row - 1
-stride_next_row_right = stride_next_row + 1
-
-// ping pong buffers for propagating tachyons
-tachyon_positions_in = &tachyon_positions_1[0]
-tachyon_positions_out = &tachyon_positions_2[0]
-
-tachyon_positions_in[0] = start_tachyon_pos
-tachyon_positions_in_count = 1
-loop
-    if seek_pos == sizeof(input)
+    if input[grid_width] == '\n'
         break
 
-    tachyon_positions_out_count = 0
-    for tachyon_position_in in tachyon_positions_in
-        if emit_tachyon(tachy)
+    grid_width++
+// found grid width
 
-    swap(tachyon_positions_in, tachyon_positions_out)
-    tachyon_positions_in_count = tachyon_positions_out_count
+padding = alignof(u64) - (sizeof(input) % alignof(u64))
+tachyons_in = &input[sizeof(input)] + padding
+tachyons_out = tachyons_in + grid_width * sizeof(u64)
+total_size = tachyons_out + grid_width * sizeof(u64)
+
+current_size = memory.size * 64KiB
+if current_size < total_size
+    memory.grow ceil((total_size - current_size) / 64KiB)
+
+line_stride = grid_width + 1 // one past the terminating newline
+line_start = &input[line_stride]
+tachyons_in_count = 1
+tachyons_in[0] = start_pos
+loop
+    next_line_start = line_start + line_stride
+    if next_line_start == &input[sizeof(input)]
+        break // reached last line, can't propagate further
+
+    tachyon_index = 0
+    tachyon_out_count = 0
+    loop
+        if tachyon_index == grid_width
+            break
+
+        //
+
+        tachyon_index++
+
+    swap(tachyons_in, tachyons_out)
+    tachyons_in_count = tachyons_out_count
