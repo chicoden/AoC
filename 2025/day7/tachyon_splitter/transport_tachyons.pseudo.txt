@@ -1,6 +1,22 @@
 memory(
-    u8[] input, '\0'
-    padding?, u32 tachyon_count,
+    u8[] input, padding?
     u64[] tachyon_positions
 )
 
+read_pos = input
+
+start_tachyon_pos = nullptr
+loop
+    ch = *read_pos
+    if ch == 'S'
+        start_tachyon_pos = read_pos
+
+    read_pos++
+    if ch == '\n'
+        break
+stride_next_row = read_pos - &input[0]
+stride_next_row_left = stride_next_row - 1
+stride_next_row_right = stride_next_row + 1
+
+loop
+    //
