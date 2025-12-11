@@ -39,12 +39,25 @@ loop
     loop
         if tachyon_index == tachyons_in_count
             break // processed all incoming tachyons
-
         tachyon_pos = tachyons_in[tachyon_index]
-        if line_start[tachyon_pos] == '.'
-            line_start[tachyon_pos] = '|' // propagate into free space
 
-        //
+        if line_start[tachyon_pos] == '.'
+            // propagate into free space
+            line_start[tachyon_pos] = '|'
+            tachyons_out[tachyon_out_count++] = tachyon_pos
+
+        elif line_start[tachyon_pos] == '^'
+            if tachyon_pos > 0
+                if line_start[tachyon_pos - 1] == '.'
+                    // split left
+                    line_start[tachyon_pos - 1] = '|'
+                    tachyons_out[tachyon_out_count++] = tachyon_pos - 1
+
+            if tachyon_pos < grid_width-1
+                if line_start[tachyon_pos + 1] == '.'
+                    // split right
+                    line_start[tachyon_pos + 1] = '|'
+                    tachyons_out[tachyon_out_count++] = tachyon_pos + 1
 
         tachyon_index++
 
