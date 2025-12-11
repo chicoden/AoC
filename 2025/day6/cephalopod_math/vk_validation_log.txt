@@ -42,7 +42,7 @@ Launching Vulkan Application:
 - Application: CephalopodMath.exe
 - Executable: C:\Users\Pytho\Projects\AdventOfCode\2025\day6\cephalopod_math\build\CephalopodMath.exe
 - Working Directory: C:\Users\Pytho\Projects\AdventOfCode\2025\day6\cephalopod_math\build
-- Command-line Arguments: "C:\Users\Pytho\Projects\AdventOfCode\2025\day6\input.txt"
+- Command-line Arguments: C:\Users\Pytho\Projects\AdventOfCode\2025\day6\input.txt
 - Log file: C:\Users\Pytho\Projects\AdventOfCode\2025\day6\cephalopod_math\vk_validation_log.txt
 Result: 6100348226985
 Process terminated
