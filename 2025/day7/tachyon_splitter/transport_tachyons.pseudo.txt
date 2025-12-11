@@ -29,9 +29,8 @@ line_start = &input[line_stride]
 tachyons_in_count = 1
 tachyons_in[0] = start_pos
 loop
-    next_line_start = line_start + line_stride
-    if next_line_start == &input[sizeof(input)]
-        break // reached last line, can't propagate further
+    if line_start == &input[sizeof(input)]
+        break // reached end of input
 
     tachyon_index = 0
     tachyon_out_count = 0
@@ -62,4 +61,4 @@ loop
 
     swap(tachyons_in, tachyons_out)
     tachyons_in_count = tachyons_out_count
-    line_start = next_line_start
+    line_start += line_stride
