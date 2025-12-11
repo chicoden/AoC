@@ -1,22 +1,39 @@
 memory(
     u8[] input, padding?
-    u64[] tachyon_positions
+    u64[] tachyon_positions_1,
+    u64[] tachyon_positions_2
 )
 
-read_pos = input
+seek_pos = input
 
 start_tachyon_pos = nullptr
 loop
-    ch = *read_pos
+    ch = *seek_pos
     if ch == 'S'
-        start_tachyon_pos = read_pos
+        start_tachyon_pos = seek_pos
 
-    read_pos++
+    seek_pos++
     if ch == '\n'
         break
-stride_next_row = read_pos - &input[0]
+// seek_pos points to start of next line now
+
+stride_next_row = seek_pos - &input[0]
 stride_next_row_left = stride_next_row - 1
 stride_next_row_right = stride_next_row + 1
 
+// ping pong buffers for propagating tachyons
+tachyon_positions_in = &tachyon_positions_1[0]
+tachyon_positions_out = &tachyon_positions_2[0]
+
+tachyon_positions_in[0] = start_tachyon_pos
+tachyon_positions_in_count = 1
 loop
-    //
+    if seek_pos == sizeof(input)
+        break
+
+    tachyon_positions_out_count = 0
+    for tachyon_position_in in tachyon_positions_in
+        if emit_tachyon(tachy)
+
+    swap(tachyon_positions_in, tachyon_positions_out)
+    tachyon_positions_in_count = tachyon_positions_out_count
