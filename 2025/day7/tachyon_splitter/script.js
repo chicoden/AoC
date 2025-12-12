@@ -21,10 +21,15 @@
             return;
         }
 
+        let input_size = input_data.byteLength;
+        let input_offset = 0;
+
+        console.log(memory.buffer.byteLength);
         console.log(input_data);
-        new Uint8Array(memory.buffer).set(input_data);
-        let result = module.instance.exports.transport_tachyons(0, input_data.byteLength);
-        console.log(String.fromCharCode(...new Uint8Array(memory.buffer.slice(0, input_data.byteLength))));
+        new Uint8Array(memory.buffer, input_offset, input_size).set(input_data);
+        let result = module.instance.exports.transport_tachyons(input_offset, input_size);
+        console.log(String.fromCharCode(...new Uint8Array(memory.buffer, input_offset, input_size)));
         console.log(result);
+        console.log(memory.buffer.byteLength);
     };
 })();

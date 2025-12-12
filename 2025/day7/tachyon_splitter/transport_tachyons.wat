@@ -3,10 +3,14 @@
     (export "transport_tachyons" (func $transport_tachyons))
 
     (func $transport_tachyons (param $input_offset i32) (param $input_size i32) (result i32)
-        (local $grid_width i32)
-        (local $start_tachyon_pos i32)
         (local $ch i32)
+        (local $grid_width i32)
         (local $line_stride i32)
+        (local $start_tachyon_pos i32)
+        (local $tachyons_in_offset i32)
+        (local $tachyons_out_offset i32)
+        (local $tachyon_array_size i32)
+        (local $required_extra_pages i32)
 
         i32.const 0
         local.tee $grid_width
@@ -56,8 +60,55 @@
         i32.add
         local.set $line_stride
 
-        local.get $line_stride
         local.get $grid_width
+        i32.const 3
+        i32.shl
+        local.set $tachyon_array_size
+        ;; tachyon_array_size = grid_width * sizeof(u64)
+
+        local.get $input_offset
+        local.get $input_size
+        i32.add
+        i32.const 7
+        i32.add
+        i32.const 0xFFFFFFF8
+        i32.and
+        local.tee $tachyons_in_offset
+        ;; tachyons_in_offset = (input_offset + input_size + 7) / 8 * 8
+        ;; = round_up(input_offset + input_size, 8)
+
+        local.get $tachyon_array_size
+        i32.add
+        local.tee $tachyons_out_offset
+
+        local.get $tachyon_array_size
+        i32.add
+        ;; ^ required size in bytes
+        i32.const 65535
+        i32.add
+        i32.const 16
+        i32.shr_u
+        ;; ^ ceil(required_size / 64KiB)
+        memory.size $memory
         i32.sub
+        local.tee $required_extra_pages
+        i32.const 0
+        i32.gt_s
+        (if ;; required_extra_pages > 0
+            (then
+                local.get $required_extra_pages
+                memory.grow $memory
+                i32.const 0
+                i32.lt_s
+                (if ;; memory.grow returned negative (an error)
+                    (then
+                        i32.const -1
+                        return
+                    )
+                )
+            )
+        )
+
+        local.get $required_extra_pages
     )
 )
