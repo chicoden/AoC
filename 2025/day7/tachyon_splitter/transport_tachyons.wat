@@ -17,6 +17,19 @@
         (local $tachyons_out_count i32)
         (local $tachyons_end_offset i32)
         (local $tachyon_pos_offset i32)
+        (local $tachyon_pos i32)
+        (local $propagation_offset i32)
+        (local $propagation_target i32)
+
+        ;;;;;;;;;;;;;;;;;;;;;;;;;
+        (local $free_spaces i32)
+        (local $splitters i32)
+        (local $other i32)
+        i32.const 0
+        local.tee $free_spaces
+        local.tee $splitters
+        local.set $other
+        ;;;;;;;;;;;;;;;;;;;;;;;;
 
         local.get $input_offset
         local.get $input_size
@@ -136,11 +149,15 @@
             i32.lt_u
             (if
                 (then
+                    i32.const 0
+                    local.set $tachyons_out_count
+
                     local.get $tachyons_in_offset
                     local.tee $tachyon_pos_offset
-                    local.get $tachyon_array_size
+                    local.get $tachyons_in_count
                     i32.add
                     local.set $tachyons_end_offset
+
                     (loop $propagate_tachyons
                         local.get $tachyon_pos_offset
                         local.get $tachyons_end_offset
@@ -149,8 +166,42 @@
                             (then
                                 local.get $tachyon_pos_offset
                                 i32.load
-                                ;; ^ tachyon position
-                                drop
+                                local.tee $tachyon_pos
+                                local.get $line_offset
+                                i32.add
+                                local.tee $propagation_offset
+                                i32.load
+
+                                local.tee $propagation_target
+                                i32.const 0x2E ;; '.'
+                                i32.eq
+                                (if
+                                    (then ;; propagating into free space
+                                        local.get $free_spaces
+                                        i32.const 1
+                                        i32.add
+                                        local.set $free_spaces
+                                    )
+                                    (else
+                                        local.get $propagation_target
+                                        i32.const 0x5E ;; '^'
+                                        i32.eq
+                                        (if
+                                            (then ;; splitting
+                                                local.get $splitters
+                                                i32.const 1
+                                                i32.add
+                                                local.set $splitters
+                                            )
+                                            (else
+                                                local.get $other
+                                                i32.const 1
+                                                i32.add
+                                                local.set $other
+                                            )
+                                        )
+                                    )
+                                )
 
                                 local.get $tachyon_pos_offset
                                 i32.const 4 ;; sizeof(u32)
@@ -182,6 +233,6 @@
             )
         )
 
-        local.get $tachyons_in_offset
+        local.get $free_spaces
     )
 )
