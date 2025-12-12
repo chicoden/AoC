@@ -22,7 +22,7 @@
         }
 
         let input_size = input_data.byteLength;
-        let input_offset = 0;
+        let input_offset = memory.buffer.byteLength - input_size - 31;
 
         console.log(memory.buffer.byteLength);
         console.log(input_data);

@@ -17,9 +17,11 @@
         (local $tachyon_array_size i32)
         (local $required_extra_pages i32)
         (local $tachyon_pos_offset i32)
+        (local $tachyon_pos i32)
         (local $propagation_offset i32)
         (local $propagation_target i32)
-        (local $tachyon_pos i32)
+        (local $split_pos i32)
+        (local $split_offset i32)
 
         local.get $input_start
         local.get $input_size
@@ -186,14 +188,77 @@
                                         local.get $propagation_target
                                         i32.const 0x5E ;; '^'
                                         i32.eq
-                                        (if
+                                        (if ;; splitting
                                             (then
-                                                i32.const 456
-                                                call $log
-                                            )
-                                            (else
-                                                i32.const -1
-                                                call $log
+                                                local.get $tachyon_pos
+                                                i32.const 1
+                                                i32.sub
+                                                local.tee $split_pos
+                                                i32.const 0
+                                                i32.ge_s
+                                                (if ;; can propagate left
+                                                    (then
+                                                        local.get $line_start
+                                                        local.get $split_pos
+                                                        i32.add
+                                                        local.tee $split_offset
+                                                        i32.load8_u
+                                                        i32.const 0x2E ;; '.'
+                                                        i32.eq
+                                                        (if ;; spot has not been taken
+                                                            (then
+                                                                local.get $split_offset
+                                                                i32.const 0x7C ;; '|'
+                                                                i32.store8
+                                                                ;; marked where the beam propagated
+
+                                                                local.get $tachyons_out_end
+                                                                local.get $split_pos
+                                                                i32.store
+                                                                local.get $tachyons_out_end
+                                                                i32.const 4 ;; sizeof(u32)
+                                                                i32.add
+                                                                local.set $tachyons_out_end
+                                                                ;; added tachyon to the outgoing tachyons
+                                                            )
+                                                        )
+                                                    )
+                                                )
+
+                                                local.get $tachyon_pos
+                                                i32.const 1
+                                                i32.add
+                                                local.tee $split_pos
+                                                local.get $grid_width
+                                                i32.lt_s
+                                                (if ;; can propagate right
+                                                    (then
+                                                        local.get $line_start
+                                                        local.get $split_pos
+                                                        i32.add
+                                                        local.tee $split_offset
+                                                        i32.load8_u
+                                                        i32.const 0x2E ;; '.'
+                                                        i32.eq
+                                                        (if ;; spot has not been taken
+                                                            (then
+                                                                local.get $split_offset
+                                                                i32.const 0x7C ;; '|'
+                                                                i32.store8
+                                                                ;; marked where the beam propagated
+
+                                                                local.get $tachyons_out_end
+                                                                local.get $split_pos
+                                                                i32.store
+                                                                local.get $tachyons_out_end
+                                                                i32.const 4 ;; sizeof(u32)
+                                                                i32.add
+                                                                local.set $tachyons_out_end
+                                                                ;; added tachyon to the outgoing tachyons
+                                                            )
+                                                        )
+                                                    )
+                                                )
                                             )
                                         )
                                     )
