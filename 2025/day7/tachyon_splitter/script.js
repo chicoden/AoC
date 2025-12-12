@@ -31,5 +31,6 @@
         console.log(String.fromCharCode(...new Uint8Array(memory.buffer, input_offset, input_size)));
         console.log(result);
         console.log(memory.buffer.byteLength);
+        console.log(memory.buffer);
     };
 })();
