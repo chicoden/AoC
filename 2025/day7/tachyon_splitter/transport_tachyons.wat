@@ -168,8 +168,19 @@
                                 i32.eq
                                 (if
                                     (then ;; propagating into free space
-                                        i32.const 123
-                                        call $log
+                                        local.get $propagation_offset
+                                        i32.const 0x7C ;; '|'
+                                        i32.store8
+                                        ;; marked where the beam propagated
+
+                                        local.get $tachyons_out_end
+                                        local.get $tachyon_pos
+                                        i32.store
+                                        local.get $tachyons_out_end
+                                        i32.const 4 ;; sizeof(u32)
+                                        i32.add
+                                        local.set $tachyons_out_end
+                                        ;; added tachyon to the outgoing tachyons
                                     )
                                     (else
                                         local.get $propagation_target
