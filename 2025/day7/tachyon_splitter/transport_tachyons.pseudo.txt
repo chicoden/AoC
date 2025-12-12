@@ -1,7 +1,7 @@
 memory(
     u8[] input, padding?,
-    u64[] tachyons_in,
-    u64[] tachyons_out
+    u32[] tachyons_in,
+    u32[] tachyons_out
 )
 
 grid_width = 0
@@ -20,9 +20,9 @@ if last char == '\r' // stupid fucking windows
     line_stride++ // we would like to skip past carriage returns yes please
     // assume all line endings are the same
 
-tachyons_in = round_up(&input[sizeof(input)], alignof(u64))
-tachyons_out = tachyons_in + grid_width * sizeof(u64)
-total_size = tachyons_out + grid_width * sizeof(u64)
+tachyons_in = round_up(&input[sizeof(input)], alignof(u32))
+tachyons_out = tachyons_in + grid_width * sizeof(u32)
+total_size = tachyons_out + grid_width * sizeof(u32)
 
 current_size = memory.size * 64KiB
 if current_size < total_size

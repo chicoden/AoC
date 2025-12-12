@@ -72,21 +72,18 @@
         local.set $line_stride
 
         local.get $grid_width
-        i32.const 3
+        i32.const 2
         i32.shl
         local.set $tachyon_array_size
-        ;; tachyon_array_size = grid_width * sizeof(u64)
+        ;; tachyon_array_size = grid_width * sizeof(u32)
 
-        local.get $input_offset
-        local.get $input_size
+        local.get $input_end_offset
+        i32.const 3
         i32.add
-        i32.const 7
-        i32.add
-        i32.const 0xFFFFFFF8
+        i32.const 0xFFFFFFFC
         i32.and
         local.tee $tachyons_in_offset
-        ;; tachyons_in_offset = (input_offset + input_size + 7) / 8 * 8
-        ;; = round_up(input_offset + input_size, 8)
+        ;; tachyons_in_offset = round_up(input_end_offset, alignof(u32))
 
         local.get $tachyon_array_size
         i32.add
@@ -156,7 +153,7 @@
                                 drop
 
                                 local.get $tachyon_pos_offset
-                                i32.const 4
+                                i32.const 4 ;; sizeof(u32)
                                 i32.add
                                 local.set $tachyon_pos_offset
                                 ;; increment to offset of next incoming tachyon position
