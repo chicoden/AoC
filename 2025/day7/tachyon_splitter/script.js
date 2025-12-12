@@ -4,9 +4,27 @@
         js: { memory }
     });
 
-    let input_data = new Uint8Array([..."..S.\n..^.\n....\n.^..\n....\n"].map(ch => ch.charCodeAt(0)));
-    new Uint8Array(memory.buffer).set(input_data);
-    let result = module.instance.exports.transport_tachyons(0, input_data.byteLength);
-    console.log(String.fromCharCode(...new Uint8Array(memory.buffer.slice(0, input_data.byteLength))));
-    console.log(result);
+    let file_input = document.getElementById("input");
+    let problem_box = document.getElementById("problem");
+    let result_box = document.getElementById("result");
+    let calculate_button = document.querySelector("button");
+    let input_data = null;
+
+    file_input.onchange = async function() {
+        input_data = new Uint8Array(await file_input.files[0].arrayBuffer());
+        problem_box.innerText = String.fromCharCode(...input_data);
+    };
+
+    calculate_button.onclick = async function() {
+        if (input_data === null) {
+            alert("no input file ready");
+            return;
+        }
+
+        console.log(input_data);
+        new Uint8Array(memory.buffer).set(input_data);
+        let result = module.instance.exports.transport_tachyons(0, input_data.byteLength);
+        console.log(String.fromCharCode(...new Uint8Array(memory.buffer.slice(0, input_data.byteLength))));
+        console.log(result);
+    };
 })();
