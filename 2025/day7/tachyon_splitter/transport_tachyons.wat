@@ -129,7 +129,9 @@
         local.get $tachyons_in_start
         local.get $start_tachyon_pos
         i32.store
-        i32.const 4
+        local.get $tachyons_in_start
+        i32.const 4 ;; sizeof(u32)
+        i32.add
         local.set $tachyons_in_end
         ;; initialize incoming tachyons array with the starting tachyon
 
@@ -139,7 +141,61 @@
             i32.lt_u
             (if
                 (then
-                    ;;
+                    local.get $tachyons_out_start
+                    local.set $tachyons_out_end
+                    ;; array of outgoing tachyons is initially empty
+
+                    local.get $tachyons_in_start
+                    local.set $tachyon_pos_offset
+                    ;; start with first incoming tachyon
+
+                    (loop $propagate_tachyons
+                        local.get $tachyon_pos_offset
+                        local.get $tachyons_in_end
+                        i32.lt_u
+                        (if
+                            (then
+                                local.get $tachyon_pos_offset
+                                i32.load
+                                local.tee $tachyon_pos
+                                local.get $line_start
+                                i32.add
+                                local.tee $propagation_offset
+                                i32.load8_u
+
+                                local.tee $propagation_target
+                                i32.const 0x2E ;; '.'
+                                i32.eq
+                                (if
+                                    (then ;; propagating into free space
+                                        i32.const 123
+                                        call $log
+                                    )
+                                    (else
+                                        local.get $propagation_target
+                                        i32.const 0x5E ;; '^'
+                                        i32.eq
+                                        (if
+                                            (then
+                                                i32.const 456
+                                                call $log
+                                            )
+                                            (else
+                                                i32.const -1
+                                                call $log
+                                            )
+                                        )
+                                    )
+                                )
+
+                                local.get $tachyon_pos_offset
+                                i32.const 4 ;; sizeof(u32)
+                                i32.add
+                                local.set $tachyon_pos_offset
+                                br $propagate_tachyons
+                            )
+                        )
+                    )
 
                     local.get $tachyons_in_start
                     local.get $tachyons_out_start
@@ -147,14 +203,13 @@
                     local.set $tachyons_out_start
                     local.get $tachyons_out_end
                     local.set $tachyons_in_end
-                    ;; swapped incoming tachyons array with outgoing tachyons array
+                    ;; swapped allocations for incoming and outgoing tachyons
+                    ;; the outgoing tachyons become the incoming tachyons
 
                     local.get $line_start
                     local.get $line_stride
                     i32.add
                     local.set $line_start
-                    ;; incremented to next line
-
                     br $trickle_down
                 )
             )
