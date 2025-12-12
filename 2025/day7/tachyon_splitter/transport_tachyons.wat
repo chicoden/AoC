@@ -1,5 +1,6 @@
 (module
     (import "js" "memory" (memory $memory 1))
+    (import "js" "log" (func $log (param i32)))
     (export "transport_tachyons" (func $transport_tachyons))
 
     (func $transport_tachyons (param $input_offset i32) (param $input_size i32) (result i32)
@@ -20,16 +21,6 @@
         (local $tachyon_pos i32)
         (local $propagation_offset i32)
         (local $propagation_target i32)
-
-        ;;;;;;;;;;;;;;;;;;;;;;;;;
-        (local $free_spaces i32)
-        (local $splitters i32)
-        (local $other i32)
-        i32.const 0
-        local.tee $free_spaces
-        local.tee $splitters
-        local.set $other
-        ;;;;;;;;;;;;;;;;;;;;;;;;
 
         local.get $input_offset
         local.get $input_size
@@ -155,6 +146,8 @@
                     local.get $tachyons_in_offset
                     local.tee $tachyon_pos_offset
                     local.get $tachyons_in_count
+                    i32.const 2
+                    i32.shl
                     i32.add
                     local.set $tachyons_end_offset
 
@@ -170,17 +163,15 @@
                                 local.get $line_offset
                                 i32.add
                                 local.tee $propagation_offset
-                                i32.load
+                                i32.load8_u
 
                                 local.tee $propagation_target
                                 i32.const 0x2E ;; '.'
                                 i32.eq
                                 (if
                                     (then ;; propagating into free space
-                                        local.get $free_spaces
-                                        i32.const 1
-                                        i32.add
-                                        local.set $free_spaces
+                                        i32.const 123
+                                        call $log
                                     )
                                     (else
                                         local.get $propagation_target
@@ -188,16 +179,12 @@
                                         i32.eq
                                         (if
                                             (then ;; splitting
-                                                local.get $splitters
-                                                i32.const 1
-                                                i32.add
-                                                local.set $splitters
+                                                i32.const 456
+                                                call $log
                                             )
                                             (else
-                                                local.get $other
-                                                i32.const 1
-                                                i32.add
-                                                local.set $other
+                                                i32.const -1
+                                                call $log
                                             )
                                         )
                                     )
@@ -233,6 +220,6 @@
             )
         )
 
-        local.get $free_spaces
+        i32.const 123
     )
 )

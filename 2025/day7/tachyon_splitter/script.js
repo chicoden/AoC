@@ -1,7 +1,7 @@
 (async function main() {
     let memory = new WebAssembly.Memory({ initial: 1 });
     let module = await WebAssembly.instantiateStreaming(fetch("transport_tachyons.wasm"), {
-        js: { memory }
+        js: { memory, log: x => console.log(`Value: ${x}`) }
     });
 
     let file_input = document.getElementById("input");
