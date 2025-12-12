@@ -1,6 +1,5 @@
 (module
     (import "js" "memory" (memory $memory 1))
-    (import "js" "log" (func $log (param i32)))
     (export "transport_tachyons" (func $transport_tachyons))
 
     (func $transport_tachyons (param $input_start i32) (param $input_size i32) (result i32)
@@ -22,6 +21,7 @@
         (local $propagation_target i32)
         (local $split_pos i32)
         (local $split_offset i32)
+        (local $split_count i32)
 
         local.get $input_start
         local.get $input_size
@@ -137,6 +137,8 @@
         local.set $tachyons_in_end
         ;; initialize incoming tachyons array with the starting tachyon
 
+        i32.const 0
+        local.set $split_count
         (loop $trickle_down
             local.get $line_start
             local.get $input_end
@@ -190,6 +192,12 @@
                                         i32.eq
                                         (if ;; splitting
                                             (then
+                                                local.get $split_count
+                                                i32.const 1
+                                                i32.add
+                                                local.set $split_count
+                                                ;; counted the split
+
                                                 local.get $tachyon_pos
                                                 i32.const 1
                                                 i32.sub
@@ -291,10 +299,7 @@
             )
         )
 
-        local.get $tachyons_in_start
-        call $log
-        local.get $tachyons_out_start
-        call $log
-        local.get $required_extra_pages
+        local.get $split_count
+        ;; leave split count on the stack as the return value
     )
 )
