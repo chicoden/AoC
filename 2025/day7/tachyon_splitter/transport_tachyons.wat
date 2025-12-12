@@ -11,6 +11,15 @@
         (local $tachyons_out_offset i32)
         (local $tachyon_array_size i32)
         (local $required_extra_pages i32)
+        (local $tachyons_in_count i32)
+        (local $tachyons_out_count i32)
+        (local $line_offset i32)
+        (local $input_end_offset i32)
+
+        local.get $input_offset
+        local.get $input_size
+        i32.add
+        local.set $input_end_offset
 
         i32.const 0
         local.tee $grid_width
@@ -109,6 +118,44 @@
             )
         )
 
-        local.get $required_extra_pages
+        local.get $input_offset
+        local.get $line_stride
+        i32.add
+        local.set $line_offset
+        ;; start propagating to the second line
+
+        i32.const 1
+        local.set $tachyons_in_count
+        local.get $tachyons_in_offset
+        local.get $start_tachyon_pos
+        i32.store
+        ;; initialize incoming tachyons array with the starting tachyon
+
+        (loop $trickle_down
+            local.get $line_offset
+            local.get $input_end_offset
+            i32.lt_u
+            (if
+                (then
+                    ;; propagate tachyons (TODO)
+
+                    local.get $tachyons_in_offset
+                    local.get $tachyons_out_offset
+                    local.set $tachyons_in_offset
+                    local.set $tachyons_out_offset
+                    local.get $tachyons_out_count
+                    local.set $tachyons_in_count
+                    ;; swapped incoming tachyons array with outgoing tachyons array
+
+                    local.get $line_offset
+                    local.get $line_stride
+                    i32.add
+                    local.set $line_offset
+                    ;; incremented to next line
+
+                    br $trickle_down
+                )
+            )
+        )
     )
 )
