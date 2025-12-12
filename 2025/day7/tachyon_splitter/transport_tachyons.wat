@@ -6,6 +6,8 @@
         (local $ch i32)
         (local $grid_width i32)
         (local $line_stride i32)
+        (local $line_offset i32)
+        (local $input_end_offset i32)
         (local $start_tachyon_pos i32)
         (local $tachyons_in_offset i32)
         (local $tachyons_out_offset i32)
@@ -13,8 +15,8 @@
         (local $required_extra_pages i32)
         (local $tachyons_in_count i32)
         (local $tachyons_out_count i32)
-        (local $line_offset i32)
-        (local $input_end_offset i32)
+        (local $tachyons_end_offset i32)
+        (local $tachyon_pos_offset i32)
 
         local.get $input_offset
         local.get $input_size
@@ -137,7 +139,32 @@
             i32.lt_u
             (if
                 (then
-                    ;; propagate tachyons (TODO)
+                    local.get $tachyons_in_offset
+                    local.tee $tachyon_pos_offset
+                    local.get $tachyon_array_size
+                    i32.add
+                    local.set $tachyons_end_offset
+                    (loop $propagate_tachyons
+                        local.get $tachyon_pos_offset
+                        local.get $tachyons_end_offset
+                        i32.lt_u
+                        (if
+                            (then
+                                local.get $tachyon_pos_offset
+                                i32.load
+                                ;; ^ tachyon position
+                                drop
+
+                                local.get $tachyon_pos_offset
+                                i32.const 4
+                                i32.add
+                                local.set $tachyon_pos_offset
+                                ;; increment to offset of next incoming tachyon position
+
+                                br $propagate_tachyons
+                            )
+                        )
+                    )
 
                     local.get $tachyons_in_offset
                     local.get $tachyons_out_offset
@@ -157,5 +184,7 @@
                 )
             )
         )
+
+        local.get $tachyons_in_offset
     )
 )
